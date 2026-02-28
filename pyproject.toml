@@ -9,7 +9,9 @@ dependencies = []
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    "scipy>=1.12",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: long-running statistical tests"]
