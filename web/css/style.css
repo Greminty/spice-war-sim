@@ -1,0 +1,201 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 16px;
+    color: #333;
+    background: #fafafa;
+}
+
+h1 {
+    margin-top: 0;
+}
+
+.hidden {
+    display: none;
+}
+
+/* Loading screen */
+#loading-screen {
+    text-align: center;
+    padding-top: 20vh;
+}
+
+/* Spinner */
+.spinner {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    border: 3px solid #ddd;
+    border-top-color: #333;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Status badges */
+.status {
+    font-size: 0.8em;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.status.valid {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status.invalid {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Error messages */
+.error-msg {
+    color: #dc3545;
+    margin-top: 4px;
+    white-space: pre-wrap;
+    font-size: 0.9em;
+}
+
+/* Textareas */
+textarea {
+    width: 100%;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    tab-size: 2;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    resize: vertical;
+}
+
+/* Sections */
+section {
+    margin-bottom: 24px;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+}
+
+/* Editor controls */
+.editor-controls {
+    margin-bottom: 8px;
+}
+
+.editor-controls button,
+.result-controls button,
+.run-group button {
+    padding: 6px 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    margin-right: 6px;
+    margin-bottom: 4px;
+}
+
+.editor-controls button:hover,
+.result-controls button:hover,
+.run-group button:hover {
+    background: #f0f0f0;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Run controls */
+.run-group {
+    display: inline-block;
+    vertical-align: top;
+    margin-right: 32px;
+    margin-bottom: 8px;
+}
+
+.run-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.9em;
+}
+
+.run-group input[type="number"] {
+    width: 100px;
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Tables */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 6px 10px;
+    text-align: right;
+}
+
+th {
+    background: #f5f5f5;
+}
+
+td:first-child, th:first-child {
+    text-align: left;
+}
+
+/* Event accordion */
+details {
+    margin-bottom: 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 8px;
+}
+
+summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.battle-detail {
+    margin: 8px 0;
+    padding: 8px;
+    background: #f9f9f9;
+    border-radius: 4px;
+}
+
+.probs {
+    font-size: 0.85em;
+    color: #666;
+}
+
+/* Charts */
+#chart-section canvas {
+    max-height: 400px;
+    margin-bottom: 16px;
+}
+
+/* Result controls */
+.result-controls {
+    margin-bottom: 12px;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .run-group {
+        display: block;
+        margin-right: 0;
+    }
+}

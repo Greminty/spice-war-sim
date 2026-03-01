@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spice War Simulator</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.27.4/full/pyodide.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div id="loading-screen">
+        <h1>Spice War Simulator</h1>
+        <div class="spinner"></div>
+        <p id="loading-status">Loading Python runtime...</p>
+    </div>
+
+    <div id="app" class="hidden">
+        <header>
+            <h1>Spice War Simulator</h1>
+        </header>
+
+        <main>
+            <!-- State Editor -->
+            <section id="state-editor">
+                <h2>Game State <span id="state-status" class="status"></span></h2>
+                <div class="editor-controls">
+                    <button id="state-upload-btn">Upload JSON</button>
+                    <input type="file" id="state-file-input" accept=".json" class="hidden">
+                </div>
+                <textarea id="state-textarea" rows="20" spellcheck="false"></textarea>
+                <div id="state-error" class="error-msg hidden"></div>
+                <div id="state-summary" class="hidden"></div>
+            </section>
+
+            <!-- Model Editor -->
+            <section id="model-editor">
+                <h2>Model Config <span id="model-status" class="status"></span></h2>
+                <div class="editor-controls">
+                    <button id="model-upload-btn">Upload JSON</button>
+                    <input type="file" id="model-file-input" accept=".json" class="hidden">
+                    <button id="csv-import-btn">Import CSV</button>
+                    <input type="file" id="csv-file-input" accept=".csv" class="hidden">
+                    <button id="csv-template-btn">Download CSV Template</button>
+                </div>
+                <textarea id="model-textarea" rows="10" spellcheck="false"></textarea>
+                <div id="model-error" class="error-msg hidden"></div>
+            </section>
+
+            <!-- Run Controls -->
+            <section id="run-controls">
+                <h2>Run Simulation</h2>
+                <div class="run-group">
+                    <h3>Single Run</h3>
+                    <label>Seed: <input type="number" id="single-seed" placeholder="auto"></label>
+                    <button id="run-single-btn" disabled>Run</button>
+                </div>
+                <div class="run-group">
+                    <h3>Monte Carlo</h3>
+                    <label>Iterations: <input type="number" id="mc-iterations" value="1000" min="1"></label>
+                    <label>Base seed: <input type="number" id="mc-base-seed" value="0" min="0"></label>
+                    <button id="run-mc-btn" disabled>Run Monte Carlo</button>
+                </div>
+                <div id="run-spinner" class="spinner hidden"></div>
+            </section>
+
+            <!-- Results -->
+            <section id="results" class="hidden">
+                <h2>Results</h2>
+                <div class="result-controls">
+                    <button id="download-results-btn">Download Results JSON</button>
+                    <button id="download-model-btn">Download Model JSON</button>
+                </div>
+                <div id="results-content"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="js/pyodide-loader.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
