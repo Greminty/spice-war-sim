@@ -3,5 +3,15 @@
   "event_targets": {
     "1": {"RAG3": "Hot"},
     "2": {"Hot": "RAG3"}
+  },
+  "battle_outcome_matrix": {
+    "wednesday": {
+      "RAG3": {"Hot": {"custom": 1.0, "custom_theft_percentage": 10}},
+      "Hot": {"RAG3": {"custom": 1.0, "custom_theft_percentage": 10}}
+    },
+    "saturday": {
+      "RAG3": {"Hot": {"custom": 1.0, "custom_theft_percentage": 10}},
+      "Hot": {"RAG3": {"custom": 1.0, "custom_theft_percentage": 10}}
+    }
   }
 }

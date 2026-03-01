@@ -130,6 +130,11 @@ def load_model_config(
     return data
 
 
+_ALLOWED_PAIRING_KEYS = {
+    "full_success", "partial_success", "custom", "custom_theft_percentage",
+}
+
+
 def _check_model_references(data: dict, alliance_ids: set[str]) -> None:
     errors = []
 
@@ -141,10 +146,45 @@ def _check_model_references(data: dict, alliance_ids: set[str]) -> None:
                 errors.append(
                     f"battle_outcome_matrix references unknown alliance '{attacker_id}'"
                 )
-            for defender_id in defenders:
+            for defender_id, pairing in defenders.items():
                 if defender_id not in alliance_ids:
                     errors.append(
                         f"battle_outcome_matrix references unknown alliance '{defender_id}'"
+                    )
+
+                unknown_keys = set(pairing.keys()) - _ALLOWED_PAIRING_KEYS
+                if unknown_keys:
+                    errors.append(
+                        f"battle_outcome_matrix[{day}][{attacker_id}][{defender_id}] "
+                        f"has unknown keys: {sorted(unknown_keys)}"
+                    )
+
+                custom_prob = pairing.get("custom")
+                custom_theft = pairing.get("custom_theft_percentage")
+
+                if custom_prob is not None and custom_theft is None:
+                    errors.append(
+                        f"battle_outcome_matrix[{day}][{attacker_id}][{defender_id}] "
+                        f"has 'custom' but missing 'custom_theft_percentage'"
+                    )
+
+                if custom_theft is not None:
+                    if not (0 <= custom_theft <= 100):
+                        errors.append(
+                            f"battle_outcome_matrix[{day}][{attacker_id}][{defender_id}] "
+                            f"'custom_theft_percentage' must be between 0 and 100, "
+                            f"got {custom_theft}"
+                        )
+
+                total = (
+                    pairing.get("full_success", 0)
+                    + pairing.get("partial_success", 0)
+                    + pairing.get("custom", 0)
+                )
+                if total > 1.0 + 1e-9:
+                    errors.append(
+                        f"battle_outcome_matrix[{day}][{attacker_id}][{defender_id}] "
+                        f"probabilities sum to {total}, exceeding 1.0"
                     )
 
     # Check event_targets

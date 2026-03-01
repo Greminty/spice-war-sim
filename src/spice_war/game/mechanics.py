@@ -16,7 +16,13 @@ def calculate_building_count(spice_amount: int) -> int:
     return 0
 
 
-def calculate_theft_percentage(outcome_level: str, building_count: int) -> float:
+def calculate_theft_percentage(
+    outcome_level: str,
+    building_count: int,
+    custom_theft_percentage: float | None = None,
+) -> float:
+    if outcome_level == "custom":
+        return custom_theft_percentage
     if outcome_level == "full_success":
         return building_count * 5.0 + 10.0
     elif outcome_level == "partial_success":

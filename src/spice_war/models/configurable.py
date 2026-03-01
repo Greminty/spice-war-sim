@@ -145,17 +145,47 @@ class ConfigurableModel(BattleModel):
                 / len(probs_list),
             }
 
+            # Average custom probability across all attackers (0 for those without)
+            custom_probs = [p.get("custom", 0.0) for p in probs_list]
+            custom_avg = sum(custom_probs) / len(probs_list)
+
+            if custom_avg > 0:
+                combined["custom"] = custom_avg
+                # Average theft % only across attackers that have it
+                theft_pcts = [
+                    p["custom_theft_percentage"]
+                    for p in probs_list
+                    if "custom_theft_percentage" in p
+                ]
+                combined["custom_theft_percentage"] = (
+                    sum(theft_pcts) / len(theft_pcts)
+                )
+
         combined["fail"] = max(
-            0.0, 1.0 - combined["full_success"] - combined["partial_success"]
+            0.0,
+            1.0
+            - combined["full_success"]
+            - combined["partial_success"]
+            - combined.get("custom", 0.0),
         )
 
+        # Outcome roll
         roll = self.rng.random()
-        if roll < combined["full_success"]:
+        cumulative = combined["full_success"]
+        if roll < cumulative:
             outcome = "full_success"
-        elif roll < combined["full_success"] + combined["partial_success"]:
-            outcome = "partial_success"
         else:
-            outcome = "fail"
+            cumulative += combined["partial_success"]
+            if roll < cumulative:
+                outcome = "partial_success"
+            elif "custom" in combined:
+                cumulative += combined["custom"]
+                if roll < cumulative:
+                    outcome = "custom"
+                else:
+                    outcome = "fail"
+            else:
+                outcome = "fail"
 
         return outcome, combined
 
@@ -171,12 +201,23 @@ class ConfigurableModel(BattleModel):
         pairing = attacker_entry.get(defender.alliance_id)
 
         if pairing is not None:
-            full = pairing["full_success"]
+            full = pairing.get("full_success", 0.0)
+            result = {"full_success": full}
+
             if "partial_success" in pairing:
-                partial = pairing["partial_success"]
+                result["partial_success"] = pairing["partial_success"]
+            elif "custom" not in pairing:
+                # Legacy behavior: derive partial only when neither partial
+                # nor custom is explicitly configured
+                result["partial_success"] = (1.0 - full) * 0.4
             else:
-                partial = (1.0 - full) * 0.4
-            return {"full_success": full, "partial_success": partial}
+                result["partial_success"] = 0.0
+
+            if "custom" in pairing:
+                result["custom"] = pairing["custom"]
+                result["custom_theft_percentage"] = pairing["custom_theft_percentage"]
+
+            return result
 
         return self._heuristic_probabilities(attacker, defender, day)
 

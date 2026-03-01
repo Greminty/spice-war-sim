@@ -9,10 +9,13 @@ def resolve_battle(
     outcome_level: str,
     damage_splits: dict[str, float],
     current_spice: dict[str, int],
+    custom_theft_percentage: float | None = None,
 ) -> dict[str, int]:
     defender_spice = current_spice[primary_defender]
     building_count = calculate_building_count(defender_spice)
-    theft_pct = calculate_theft_percentage(outcome_level, building_count)
+    theft_pct = calculate_theft_percentage(
+        outcome_level, building_count, custom_theft_percentage
+    )
     total_stolen = int(defender_spice * theft_pct / 100.0)
 
     transfers: dict[str, int] = {}

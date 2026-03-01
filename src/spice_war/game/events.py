@@ -29,17 +29,20 @@ def coordinate_battle(
         current_state, attackers, primary_defender
     )
 
+    custom_theft_pct = probabilities.get("custom_theft_percentage")
+
     transfers = resolve_battle(
         attackers=[a.alliance_id for a in attackers],
         primary_defender=primary_defender.alliance_id,
         outcome_level=outcome,
         damage_splits=splits,
         current_spice=current_state.current_spice,
+        custom_theft_percentage=custom_theft_pct,
     )
 
     defender_spice = current_state.current_spice[primary_defender.alliance_id]
     building_count = calculate_building_count(defender_spice)
-    theft_pct = calculate_theft_percentage(outcome, building_count)
+    theft_pct = calculate_theft_percentage(outcome, building_count, custom_theft_pct)
 
     battle_info = {
         "attackers": [a.alliance_id for a in attackers],
