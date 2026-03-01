@@ -1,0 +1,16 @@
+{
+  "random_seed": 42,
+  "default_targets": {
+    "VON": {"target": "Ghst"},
+    "Ghst": {"target": "VON"}
+  },
+  "battle_outcome_matrix": {
+    "wednesday": {
+      "Ghst": {"VON": {"full_success": 1.0}}
+    },
+    "saturday": {
+      "Ghst": {"VON": {"full_success": 1.0}},
+      "VON": {"Ghst": {"full_success": 0.0, "partial_success": 0.0}}
+    }
+  }
+}

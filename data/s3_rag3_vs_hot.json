@@ -6,12 +6,11 @@
   },
   "battle_outcome_matrix": {
     "wednesday": {
-      "RAG3": {"Hot": {"custom": 1.0, "custom_theft_percentage": 10}},
-      "Hot": {"RAG3": {"custom": 1.0, "custom_theft_percentage": 10}}
+      "RAG3": {"Hot": {"custom": 1.0, "custom_theft_percentage": 15}}
     },
     "saturday": {
-      "RAG3": {"Hot": {"custom": 1.0, "custom_theft_percentage": 10}},
-      "Hot": {"RAG3": {"custom": 1.0, "custom_theft_percentage": 10}}
+      "Hot": {"RAG3": {"custom": 1.0, "custom_theft_percentage": 15}}
     }
+
   }
 }
