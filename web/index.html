@@ -28,9 +28,12 @@
                     <button id="state-upload-btn">Upload JSON</button>
                     <input type="file" id="state-file-input" accept=".json" class="hidden">
                 </div>
-                <textarea id="state-textarea" rows="20" spellcheck="false"></textarea>
                 <div id="state-error" class="error-msg hidden"></div>
                 <div id="state-summary" class="hidden"></div>
+                <details id="state-json-toggle">
+                    <summary>Edit JSON</summary>
+                    <textarea id="state-textarea" rows="20" spellcheck="false"></textarea>
+                </details>
             </section>
 
             <!-- Model Editor -->
@@ -42,9 +45,18 @@
                     <button id="csv-import-btn">Import CSV</button>
                     <input type="file" id="csv-file-input" accept=".csv" class="hidden">
                     <button id="csv-template-btn">Download CSV Template</button>
+                    <button id="model-view-toggle" class="toggle-btn">Edit as JSON</button>
+                    <button id="download-model-btn">Download Model JSON</button>
                 </div>
-                <textarea id="model-textarea" rows="10" spellcheck="false"></textarea>
                 <div id="model-error" class="error-msg hidden"></div>
+
+                <!-- Form view (default) -->
+                <div id="model-form"></div>
+
+                <!-- JSON view (hidden) -->
+                <div id="model-json-view" class="hidden">
+                    <textarea id="model-textarea" rows="20" spellcheck="false"></textarea>
+                </div>
             </section>
 
             <!-- Run Controls -->
@@ -69,7 +81,6 @@
                 <h2>Results</h2>
                 <div class="result-controls">
                     <button id="download-results-btn">Download Results JSON</button>
-                    <button id="download-model-btn">Download Model JSON</button>
                 </div>
                 <div id="results-content"></div>
             </section>

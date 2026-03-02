@@ -192,6 +192,167 @@ summary {
     margin-bottom: 12px;
 }
 
+/* Model form sections */
+.model-section {
+    margin-bottom: 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 0;
+}
+
+.model-section > summary {
+    padding: 10px 12px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.model-section[open] > summary {
+    border-bottom: 1px solid #e0e0e0;
+    border-radius: 4px 4px 0 0;
+}
+
+.model-section > :not(summary) {
+    padding: 12px;
+}
+
+/* Form grid for inline controls */
+.form-grid {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 12px;
+}
+
+.form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.form-grid select,
+.form-grid input[type="number"] {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+/* Form tables */
+.form-table {
+    width: 100%;
+    margin: 0;
+}
+
+.form-table select {
+    width: 100%;
+    padding: 3px 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+/* Percentage inputs in outcome matrix */
+.pct-input {
+    width: 80px;
+    padding: 3px 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 13px;
+    text-align: right;
+}
+
+/* Add/remove row buttons */
+.add-row-btn {
+    margin: 8px 12px;
+    padding: 4px 12px;
+    border: 1px dashed #aaa;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    color: #555;
+    font-size: 0.85em;
+}
+
+.add-row-btn:hover {
+    background: #f0f0f0;
+    border-color: #888;
+}
+
+.remove-row-btn {
+    border: none;
+    background: transparent;
+    color: #999;
+    cursor: pointer;
+    font-size: 1.2em;
+    padding: 2px 6px;
+}
+
+.remove-row-btn:hover {
+    color: #dc3545;
+}
+
+/* Event subsections within accordion panels */
+.event-subsection,
+.day-subsection {
+    margin-bottom: 12px;
+    padding: 0 12px 12px;
+}
+
+.event-subsection h4,
+.day-subsection h4 {
+    margin: 8px 0;
+    font-size: 0.95em;
+    color: #555;
+}
+
+/* Help text */
+.help-text {
+    font-size: 0.85em;
+    color: #888;
+    margin: 4px 12px 8px;
+}
+
+.muted {
+    color: #999;
+    font-style: italic;
+    padding: 12px;
+}
+
+/* View toggle button */
+.toggle-btn {
+    font-weight: 500;
+}
+
+/* Validation highlight on outcome rows */
+.validation-error {
+    background: #fff3f3;
+}
+
+.validation-error .pct-input {
+    border-color: #dc3545;
+}
+
+.validation-inline {
+    color: #dc3545;
+    font-size: 0.85em;
+    margin: 4px 12px;
+}
+
+/* State JSON toggle */
+#state-json-toggle {
+    margin-top: 8px;
+}
+
+#state-json-toggle summary {
+    cursor: pointer;
+    color: #555;
+    font-size: 0.9em;
+}
+
 /* Responsive */
 @media (max-width: 600px) {
     .run-group {

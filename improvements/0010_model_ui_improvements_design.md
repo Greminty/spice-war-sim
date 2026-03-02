@@ -1,174 +1,107 @@
-/* global PyBridge, Chart */
+# Model Config UI Improvements — Design
 
-let stateValidationTimer = null;
-let currentStateDict = null;
-let stateIsValid = false;
+## Overview
 
-let modelValidationTimer = null;
-let modelIsValid = false;
+Replace the model config raw JSON textarea with a structured, section-based form editor built from seven accordion panels (General Settings, Faction Targeting, Default Targets, Event Targets, Event Reinforcements, Battle Outcome Matrix, Damage Weights). Add a collapsible "Edit JSON" toggle to the state editor so the textarea is hidden by default while the summary tables remain always visible. A "Edit as JSON" / "Back to form" toggle on the model editor provides a raw-JSON escape hatch. All form changes regenerate JSON and re-validate through the existing `PyBridge.validateModelConfig` path. No Python backend changes are needed — all modifications are confined to `web/index.html`, `web/js/app.js`, and `web/css/style.css`.
 
+---
+
+## 1. Collapsible State Editor
+
+### Modified markup in `web/index.html`
+
+The state section is restructured so the summary tables and controls sit outside a `<details>` element, while the textarea is wrapped inside it. The upload button, validation badge, and error message remain always visible.
+
+```html
+<!-- State Editor -->
+<section id="state-editor">
+    <h2>Game State <span id="state-status" class="status"></span></h2>
+    <div class="editor-controls">
+        <button id="state-upload-btn">Upload JSON</button>
+        <input type="file" id="state-file-input" accept=".json" class="hidden">
+    </div>
+    <div id="state-error" class="error-msg hidden"></div>
+    <div id="state-summary" class="hidden"></div>
+    <details id="state-json-toggle">
+        <summary>Edit JSON</summary>
+        <textarea id="state-textarea" rows="20" spellcheck="false"></textarea>
+    </details>
+</section>
+```
+
+The `<details>` element is collapsed by default (no `open` attribute). The existing `validateState()`, `onStateInput()`, and `renderStateSummary()` functions are unchanged — the textarea retains its `id` and event wiring. The only JS change is moving the summary container (`#state-summary`) before the `<details>` element in the DOM, which the new HTML already reflects.
+
+---
+
+## 2. Model Config — Sectioned Form
+
+### Modified markup in `web/index.html`
+
+The model editor section replaces the single textarea with a form container and a hidden JSON textarea that appears on toggle.
+
+```html
+<!-- Model Editor -->
+<section id="model-editor">
+    <h2>Model Config <span id="model-status" class="status"></span></h2>
+    <div class="editor-controls">
+        <button id="model-upload-btn">Upload JSON</button>
+        <input type="file" id="model-file-input" accept=".json" class="hidden">
+        <button id="csv-import-btn">Import CSV</button>
+        <input type="file" id="csv-file-input" accept=".csv" class="hidden">
+        <button id="csv-template-btn">Download CSV Template</button>
+        <button id="model-view-toggle" class="toggle-btn">Edit as JSON</button>
+        <button id="download-model-btn">Download Model JSON</button>
+    </div>
+    <div id="model-error" class="error-msg hidden"></div>
+
+    <!-- Form view (default) -->
+    <div id="model-form"></div>
+
+    <!-- JSON view (hidden) -->
+    <div id="model-json-view" class="hidden">
+        <textarea id="model-textarea" rows="20" spellcheck="false"></textarea>
+    </div>
+</section>
+```
+
+The "Download Model JSON" button moves up into the editor controls so it's always accessible regardless of view mode.
+
+### Form structure
+
+`#model-form` is populated by JS. Each section is a `<details>` element that can open/close independently (multiple can be open at once). The initial render generates all seven sections. Sections that depend on alliance/event data show a "Load valid state first" placeholder when `stateIsValid` is false.
+
+---
+
+## 3. Model Form State
+
+### New module-level state in `web/js/app.js`
+
+```javascript
 // Current model form data, mirrors the JSON structure.
 // null when form hasn't been populated yet.
 let modelFormData = null;
 
 // Tracks which view is active: "form" or "json"
 let modelViewMode = "form";
+```
 
-let lastResult = null;
-let tierChartInstance = null;
-let spiceChartInstance = null;
+`modelFormData` is a plain object with the same shape as a model config JSON. Every form interaction mutates this object and calls `syncFormToJson()`.
 
-// --- Initialization ---
+---
 
-document.addEventListener("DOMContentLoaded", async () => {
-    const loadingStatus = document.getElementById("loading-status");
+## 4. Building the Form
 
-    await PyBridge.init((msg) => {
-        loadingStatus.textContent = msg;
-    });
+#### `buildModelForm()`
 
-    document.getElementById("loading-screen").classList.add("hidden");
-    document.getElementById("app").classList.remove("hidden");
+Called on initialization (after state is validated) and whenever the state changes. Reads `modelFormData` and populates `#model-form` with seven accordion sections.
 
-    // Load default state
-    const defaultState = PyBridge.getDefaultState();
-    document.getElementById("state-textarea").value = JSON.stringify(defaultState, null, 2);
-    validateState();
-
-    // Load default model — populate both form and textarea
-    const defaultModel = PyBridge.getDefaultModelConfig();
-    modelFormData = defaultModel;
-    document.getElementById("model-textarea").value = JSON.stringify(defaultModel, null, 2);
-    buildModelForm();
-    validateModel();
-
-    updateRunButtons();
-    setupEventHandlers();
-});
-
-// --- State Validation ---
-
-function validateState() {
-    const textarea = document.getElementById("state-textarea");
-    const statusEl = document.getElementById("state-status");
-    const errorEl = document.getElementById("state-error");
-    const summaryEl = document.getElementById("state-summary");
-
-    let parsed;
-    try {
-        parsed = JSON.parse(textarea.value);
-    } catch (e) {
-        statusEl.className = "status invalid";
-        statusEl.textContent = "Invalid JSON";
-        errorEl.textContent = e.message;
-        errorEl.classList.remove("hidden");
-        summaryEl.classList.add("hidden");
-        stateIsValid = false;
-        currentStateDict = null;
-        updateRunButtons();
-        return;
-    }
-
-    const result = PyBridge.validateState(parsed);
-
-    if (result.ok) {
-        statusEl.className = "status valid";
-        statusEl.textContent = "Valid";
-        errorEl.classList.add("hidden");
-        currentStateDict = parsed;
-        stateIsValid = true;
-        renderStateSummary(summaryEl, result);
-        buildModelForm();
-    } else {
-        statusEl.className = "status invalid";
-        statusEl.textContent = "Invalid";
-        errorEl.textContent = result.error;
-        errorEl.classList.remove("hidden");
-        summaryEl.classList.add("hidden");
-        stateIsValid = false;
-        currentStateDict = null;
-    }
-
-    updateRunButtons();
-}
-
-function onStateInput() {
-    clearTimeout(stateValidationTimer);
-    stateValidationTimer = setTimeout(validateState, 300);
-}
-
-// --- State Summary ---
-
-function renderStateSummary(container, result) {
-    let html = "<h3>Alliances</h3><table><tr>";
-    html += "<th>ID</th><th>Faction</th><th>Power</th><th>Starting Spice</th><th>Daily Rate</th>";
-    html += "</tr>";
-    for (const a of result.alliances) {
-        html += `<tr>
-            <td>${esc(a.alliance_id)}</td>
-            <td>${esc(a.faction)}</td>
-            <td>${a.power}</td>
-            <td>${a.starting_spice.toLocaleString()}</td>
-            <td>${a.daily_rate.toLocaleString()}</td>
-        </tr>`;
-    }
-    html += "</table>";
-
-    html += "<h3>Event Schedule</h3><table><tr>";
-    html += "<th>#</th><th>Attacker</th><th>Day</th><th>Days Before</th>";
-    html += "</tr>";
-    for (const e of result.event_schedule) {
-        html += `<tr>
-            <td>${e.event_number}</td>
-            <td>${esc(e.attacker_faction)}</td>
-            <td>${esc(e.day)}</td>
-            <td>${e.days_before}</td>
-        </tr>`;
-    }
-    html += "</table>";
-
-    container.innerHTML = html;
-    container.classList.remove("hidden");
-}
-
-// --- Model Form ---
-
-function getAlliancesFromState() {
-    if (!currentStateDict) return [];
-    return currentStateDict.alliances.map(a => ({
-        id: a.alliance_id,
-        faction: a.faction,
-    }));
-}
-
-function getEventsFromState() {
-    if (!currentStateDict) return [];
-    return currentStateDict.event_schedule.map((e, i) => ({
-        number: i + 1,
-        attacker_faction: e.attacker_faction,
-        day: e.day,
-    }));
-}
-
-function alliancesByFaction(alliances) {
-    const factions = {};
-    for (const a of alliances) {
-        if (!factions[a.faction]) factions[a.faction] = [];
-        factions[a.faction].push(a.id);
-    }
-    return factions;
-}
-
+```javascript
 function buildModelForm() {
     const container = document.getElementById("model-form");
 
     if (!stateIsValid) {
         container.innerHTML = '<p class="muted">Load a valid game state to configure the model.</p>';
         return;
-    }
-
-    if (!modelFormData) {
-        modelFormData = {};
     }
 
     const alliances = getAlliancesFromState();
@@ -186,9 +119,55 @@ function buildModelForm() {
     container.innerHTML = html;
     attachFormHandlers();
 }
+```
 
-// --- Section Builders ---
+#### `getAlliancesFromState()` / `getEventsFromState()`
 
+Helpers that extract structured data from `currentStateDict` for use by form builders. These avoid re-parsing the raw textarea.
+
+```javascript
+function getAlliancesFromState() {
+    if (!currentStateDict) return [];
+    return currentStateDict.alliances.map(a => ({
+        id: a.alliance_id,
+        faction: a.faction,
+    }));
+}
+
+function getEventsFromState() {
+    if (!currentStateDict) return [];
+    return currentStateDict.event_schedule.map((e, i) => ({
+        number: i + 1,
+        attacker_faction: e.attacker_faction,
+        day: e.day,
+    }));
+}
+```
+
+#### Helper: faction-partitioned alliance lists
+
+Many sections need the alliances split by faction. This helper is used repeatedly by the section builders.
+
+```javascript
+function alliancesByFaction(alliances) {
+    const factions = {};
+    for (const a of alliances) {
+        if (!factions[a.faction]) factions[a.faction] = [];
+        factions[a.faction].push(a.id);
+    }
+    return factions;
+}
+```
+
+---
+
+## 5. Section Builders
+
+Each section builder returns an HTML string for one `<details>` accordion panel. All inputs use `data-field` attributes to identify which model config key they affect. Interactive rows (add/remove) use a consistent pattern.
+
+### 5a. General Settings
+
+```javascript
 function buildGeneralSettings() {
     const seed = modelFormData.random_seed ?? "";
     const strategy = modelFormData.targeting_strategy ?? "expected_value";
@@ -212,7 +191,13 @@ function buildGeneralSettings() {
         </div>
     </details>`;
 }
+```
 
+### 5b. Faction Targeting Strategy
+
+One row per faction. `(use global default)` emits no key.
+
+```javascript
 function buildFactionTargeting(alliances) {
     const factions = [...new Set(alliances.map(a => a.faction))];
     const fts = modelFormData.faction_targeting_strategy || {};
@@ -244,7 +229,13 @@ function buildFactionTargeting(alliances) {
         </table>
     </details>`;
 }
+```
 
+### 5c. Default Targets
+
+Dynamic rows with add/remove. Each row lets the user pick an alliance and either pin a target or select a strategy.
+
+```javascript
 function buildDefaultTargets(alliances) {
     const dt = modelFormData.default_targets || {};
     const aids = alliances.map(a => a.id);
@@ -289,7 +280,13 @@ function defaultTargetRow(aids, selectedAid, isPinned, target, strategy) {
         <td><button class="remove-row-btn" title="Remove">&times;</button></td>
     </tr>`;
 }
+```
 
+### 5d. Event Targets
+
+One sub-section per event. Alliance dropdown shows only attacking-faction alliances; target dropdown shows only defending-faction alliances.
+
+```javascript
 function buildEventTargets(alliances, events) {
     const et = modelFormData.event_targets || {};
     const byFaction = alliancesByFaction(alliances);
@@ -308,7 +305,7 @@ function buildEventTargets(alliances, events) {
         for (const [aid, val] of Object.entries(overrides)) {
             const isPinned = typeof val === "string" || (typeof val === "object" && val.target);
             const target = typeof val === "string" ? val : val.target || "";
-            const strategy = typeof val === "object" ? val.strategy || "" : "";
+            const strategy = val.strategy || "";
             rows += eventTargetRow(attackerIds, defenderIds, aid, isPinned, target, strategy, eventKey);
         }
 
@@ -330,29 +327,15 @@ function buildEventTargets(alliances, events) {
         ${sections}
     </details>`;
 }
+```
 
-function eventTargetRow(attackerIds, defenderIds, selectedAid, isPinned, target, strategy, eventKey) {
-    return `
-    <tr class="dynamic-row" data-section="event_targets" data-event="${eventKey}">
-        <td>${allianceDropdown(attackerIds, selectedAid, "et-alliance")}</td>
-        <td>
-            <select class="dt-type">
-                <option value="pin" ${isPinned ? "selected" : ""}>Pin to target</option>
-                <option value="strategy" ${!isPinned ? "selected" : ""}>Use strategy</option>
-            </select>
-        </td>
-        <td>
-            <span class="dt-pin-value ${isPinned ? "" : "hidden"}">
-                ${allianceDropdown(defenderIds, target, "et-target")}
-            </span>
-            <span class="dt-strategy-value ${isPinned ? "hidden" : ""}">
-                ${strategyDropdown(strategy, "et-strategy")}
-            </span>
-        </td>
-        <td><button class="remove-row-btn" title="Remove">&times;</button></td>
-    </tr>`;
-}
+`eventTargetRow()` follows the same pattern as `defaultTargetRow()` but constrains the alliance dropdown to `attackerIds` and the target dropdown to `defenderIds`.
 
+### 5e. Event Reinforcements
+
+One sub-section per event. Both dropdowns show defending-faction alliances.
+
+```javascript
 function buildEventReinforcements(alliances, events) {
     const er = modelFormData.event_reinforcements || {};
     const byFaction = alliancesByFaction(alliances);
@@ -393,7 +376,13 @@ function buildEventReinforcements(alliances, events) {
         ${sections}
     </details>`;
 }
+```
 
+### 5f. Battle Outcome Matrix
+
+Grouped by day. Each row has attacker/defender dropdowns (including `*` wildcard), percentage inputs, and optional custom fields.
+
+```javascript
 function buildOutcomeMatrix(alliances, events) {
     const matrix = modelFormData.battle_outcome_matrix || {};
     const aids = alliances.map(a => a.id);
@@ -455,7 +444,13 @@ function buildOutcomeMatrix(alliances, events) {
         ${sections}
     </details>`;
 }
+```
 
+#### Inline validation for outcome rows
+
+When a row's full + partial + custom exceeds 100%, a red inline message appears below the table for that day. This is computed in `collectFormData()` and displayed via the `#bom-validation-{day}` div.
+
+```javascript
 function validateOutcomeRow(full, partial, custom) {
     const total = (full || 0) + (partial || 0) + (custom || 0);
     if (total > 100) {
@@ -463,7 +458,13 @@ function validateOutcomeRow(full, partial, custom) {
     }
     return null;
 }
+```
 
+### 5g. Damage Weights
+
+Simple dynamic table with alliance dropdown and weight input.
+
+```javascript
 function buildDamageWeights(alliances) {
     const dw = modelFormData.damage_weights || {};
     const aids = alliances.map(a => a.id);
@@ -491,9 +492,15 @@ function buildDamageWeights(alliances) {
         <button class="add-row-btn" data-action="add-damage-weight">+ Add</button>
     </details>`;
 }
+```
 
-// --- Shared Dropdown Helpers ---
+---
 
+## 6. Shared Dropdown Helpers
+
+Small functions that return `<select>` HTML strings. Used by all section builders.
+
+```javascript
 function allianceDropdown(aids, selected, className) {
     let html = `<select class="${className}">`;
     for (const aid of aids) {
@@ -526,13 +533,21 @@ function strategyDropdown(selected, className) {
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
+```
 
-// --- Form Event Handling ---
+---
 
+## 7. Form Event Handling
+
+#### `attachFormHandlers()`
+
+Uses event delegation on `#model-form` to handle all input changes, add/remove actions, and type toggles with a single listener.
+
+```javascript
 function attachFormHandlers() {
     const form = document.getElementById("model-form");
 
-    form.addEventListener("input", () => {
+    form.addEventListener("input", (e) => {
         collectFormData();
         scheduleModelValidation();
     });
@@ -560,7 +575,13 @@ function attachFormHandlers() {
         }
     });
 }
+```
 
+#### `handleAddRow(button)`
+
+Reads `data-action` and `data-event`/`data-day` from the button to determine which section to append to. Inserts a new empty row before the button's parent table's last `<tr>` position (or appends to the `<tbody>`). After insertion, calls `collectFormData()` and `scheduleModelValidation()`.
+
+```javascript
 function handleAddRow(button) {
     const action = button.dataset.action;
     const table = button.previousElementSibling?.tagName === "DIV"
@@ -635,9 +656,17 @@ function handleAddRow(button) {
         scheduleModelValidation();
     }
 }
+```
 
-// --- Collecting Form Data ---
+---
 
+## 8. Collecting Form Data
+
+#### `collectFormData()`
+
+Walks the DOM inside `#model-form` and reconstructs `modelFormData` from the current form values. This is the single source of truth for form-to-JSON conversion.
+
+```javascript
 function collectFormData() {
     const data = {};
 
@@ -684,13 +713,16 @@ function collectFormData() {
         const rows = btn.parentElement.querySelectorAll('.dynamic-row');
         const overrides = {};
         for (const row of rows) {
-            const aid = row.querySelector(".et-alliance")?.value;
-            const type = row.querySelector(".dt-type")?.value;
+            const aid = row.querySelector("[class*='et-alliance']")?.value
+                     || row.querySelector("select:first-child")?.value;
+            const type = row.querySelector("[class*='dt-type']")?.value;
             if (type === "pin") {
-                const target = row.querySelector(".et-target")?.value;
+                const target = row.querySelector("[class*='dt-target']")?.value
+                            || row.querySelector("[class*='et-target']")?.value;
                 overrides[aid] = target;
             } else {
-                overrides[aid] = { strategy: row.querySelector(".et-strategy")?.value };
+                overrides[aid] = { strategy: row.querySelector("[class*='dt-strategy']")?.value
+                                          || row.querySelector("[class*='et-strategy']")?.value };
             }
         }
         if (Object.keys(overrides).length > 0) et[eventKey] = overrides;
@@ -767,14 +799,28 @@ function collectFormData() {
     modelFormData = data;
     syncFormToJson();
 }
+```
 
-// --- Form <-> JSON Synchronization ---
+---
 
+## 9. Form <-> JSON Synchronization
+
+#### `syncFormToJson()`
+
+Writes the current `modelFormData` to the hidden textarea. Called after every form change.
+
+```javascript
 function syncFormToJson() {
     const textarea = document.getElementById("model-textarea");
     textarea.value = JSON.stringify(modelFormData, null, 2);
 }
+```
 
+#### `syncJsonToForm()`
+
+Parses the textarea content and rebuilds the form. Called when switching from JSON view to form view, or after file upload / CSV import.
+
+```javascript
 function syncJsonToForm() {
     const textarea = document.getElementById("model-textarea");
     let parsed;
@@ -789,7 +835,13 @@ function syncJsonToForm() {
     buildModelForm();
     return true;
 }
+```
 
+#### `scheduleModelValidation()`
+
+Replaces the existing `onModelInput()` for form-originated changes. Same 300ms debounce, but validates from `modelFormData` rather than re-parsing the textarea.
+
+```javascript
 function scheduleModelValidation() {
     clearTimeout(modelValidationTimer);
     modelValidationTimer = setTimeout(() => {
@@ -797,9 +849,17 @@ function scheduleModelValidation() {
         validateModel();
     }, 300);
 }
+```
 
-// --- View Toggle ---
+---
 
+## 10. View Toggle
+
+#### Toggle button handler
+
+Switches between form view and JSON view. When switching to form view, parses the textarea and rebuilds the form. If the JSON contains values the form can't represent (e.g. unknown keys), shows a warning and stays in JSON view.
+
+```javascript
 function toggleModelView() {
     const toggleBtn = document.getElementById("model-view-toggle");
     const formDiv = document.getElementById("model-form");
@@ -824,440 +884,277 @@ function toggleModelView() {
         toggleBtn.textContent = "Edit as JSON";
     }
 }
+```
 
-// --- Model Validation ---
+When in JSON view, the textarea's existing `onModelInput()` handler fires on edits, preserving the current debounced validation behavior.
 
-function validateModel() {
-    const textarea = document.getElementById("model-textarea");
-    const statusEl = document.getElementById("model-status");
-    const errorEl = document.getElementById("model-error");
+---
 
-    let parsed;
-    try {
-        parsed = JSON.parse(textarea.value);
-    } catch (e) {
-        statusEl.className = "status invalid";
-        statusEl.textContent = "Invalid JSON";
-        errorEl.textContent = e.message;
-        errorEl.classList.remove("hidden");
-        modelIsValid = false;
-        updateRunButtons();
-        return;
-    }
+## 11. Initialization Changes
 
-    if (!stateIsValid) {
-        statusEl.className = "status";
-        statusEl.textContent = "Needs valid state";
-        errorEl.classList.add("hidden");
-        modelIsValid = false;
-        updateRunButtons();
-        return;
-    }
+The `DOMContentLoaded` handler is updated to populate `modelFormData` and build the form after state validation succeeds.
 
-    const result = PyBridge.validateModelConfig(parsed, currentStateDict);
+```javascript
+document.addEventListener("DOMContentLoaded", async () => {
+    const loadingStatus = document.getElementById("loading-status");
+    await PyBridge.init((msg) => {
+        loadingStatus.textContent = msg;
+    });
 
-    if (result.ok) {
-        statusEl.className = "status valid";
-        statusEl.textContent = "Valid";
-        errorEl.classList.add("hidden");
-        modelIsValid = true;
-    } else {
-        statusEl.className = "status invalid";
-        statusEl.textContent = "Invalid";
-        errorEl.textContent = result.error;
-        errorEl.classList.remove("hidden");
-        modelIsValid = false;
-    }
+    document.getElementById("loading-screen").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+
+    // Load default state
+    const defaultState = PyBridge.getDefaultState();
+    document.getElementById("state-textarea").value = JSON.stringify(defaultState, null, 2);
+    validateState();
+
+    // Load default model — populate both form and textarea
+    const defaultModel = PyBridge.getDefaultModelConfig();
+    modelFormData = defaultModel;
+    document.getElementById("model-textarea").value = JSON.stringify(defaultModel, null, 2);
+    buildModelForm();
+    validateModel();
 
     updateRunButtons();
+    setupEventHandlers();
+});
+```
+
+The `validateState()` function is extended: when state transitions from invalid to valid, or when the state content changes, it calls `buildModelForm()` to refresh the alliance/event dropdowns.
+
+```javascript
+// In validateState(), after stateIsValid = true:
+if (result.ok) {
+    // ... existing status/summary logic ...
+    buildModelForm();   // <-- added
 }
+```
 
-function onModelInput() {
-    clearTimeout(modelValidationTimer);
-    modelValidationTimer = setTimeout(validateModel, 300);
-}
+---
 
-// --- Run Controls ---
+## 12. Event Handler Updates
 
-function updateRunButtons() {
-    const canRun = stateIsValid && modelIsValid;
-    document.getElementById("run-single-btn").disabled = !canRun;
-    document.getElementById("run-mc-btn").disabled = !canRun;
-}
+#### `setupEventHandlers()` additions
 
-function setRunning(isRunning) {
-    document.getElementById("run-single-btn").disabled = isRunning;
-    document.getElementById("run-mc-btn").disabled = isRunning;
-    document.getElementById("run-spinner").classList.toggle("hidden", !isRunning);
-}
+```javascript
+// View toggle
+document.getElementById("model-view-toggle").addEventListener("click", toggleModelView);
 
-// --- Single Run ---
+// JSON textarea still gets direct input handler for JSON-view editing
+document.getElementById("model-textarea").addEventListener("input", onModelInput);
+```
 
-async function runSingle() {
-    const stateDict = JSON.parse(document.getElementById("state-textarea").value);
-    const modelDict = JSON.parse(document.getElementById("model-textarea").value);
-    const seedInput = document.getElementById("single-seed").value;
-    const seed = seedInput ? parseInt(seedInput, 10) : null;
+#### Upload / CSV import integration
 
-    setRunning(true);
-    const result = await PyBridge.runSingle(stateDict, modelDict, seed);
-    setRunning(false);
+The existing file upload and CSV import handlers are updated to sync to the form after populating the textarea.
 
-    if (!result.ok) {
-        showError(result.error);
-        return;
+```javascript
+// Model file upload — updated
+document.getElementById("model-file-input").addEventListener("change", (e) => {
+    readFileToTextarea(e.target.files[0], "model-textarea", () => {
+        syncJsonToForm();   // <-- added: populate form from uploaded JSON
+        validateModel();
+    });
+});
+
+// CSV import — updated
+reader.onload = () => {
+    const result = PyBridge.importCsv(reader.result);
+    if (result.ok) {
+        document.getElementById("model-textarea").value =
+            JSON.stringify(result.config, null, 2);
+        syncJsonToForm();   // <-- added: populate form from imported CSV
+        validateModel();
+    } else {
+        alert("CSV import error: " + result.error);
     }
+};
+```
 
-    lastResult = result;
-    renderSingleResults(result);
+---
+
+## 13. CSS Additions
+
+New styles added to `web/css/style.css`. Existing styles are unchanged.
+
+```css
+/* Model form sections */
+.model-section {
+    margin-bottom: 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 0;
 }
 
-function renderSingleResults(result) {
-    const container = document.getElementById("results-content");
-    const section = document.getElementById("results");
-    section.classList.remove("hidden");
-
-    const entries = Object.entries(result.final_spice).map(([id, spice]) => ({
-        id,
-        spice,
-        tier: result.rankings[id],
-    }));
-    entries.sort((a, b) => a.tier - b.tier || b.spice - a.spice);
-
-    let html = `<h3>Final Rankings (seed: ${result.seed})</h3>`;
-    html += "<table><tr><th>Alliance</th><th>Tier</th><th>Final Spice</th></tr>";
-    for (const e of entries) {
-        html += `<tr>
-            <td>${esc(e.id)}</td>
-            <td>${e.tier}</td>
-            <td>${e.spice.toLocaleString()}</td>
-        </tr>`;
-    }
-    html += "</table>";
-
-    html += "<h3>Event Details</h3>";
-    for (const event of result.event_history) {
-        html += `<details>
-            <summary>Event ${event.event_number}: ${esc(event.attacker_faction)} (${esc(event.day)})</summary>
-            ${renderEventDetail(event)}
-        </details>`;
-    }
-
-    container.innerHTML = html;
+.model-section > summary {
+    padding: 10px 12px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
 }
 
-function renderEventDetail(event) {
-    let html = "";
-
-    html += "<h4>Spice</h4><table>";
-    html += "<tr><th>Alliance</th><th>Before</th><th>After</th><th>Change</th></tr>";
-    for (const [id, before] of Object.entries(event.spice_before)) {
-        const after = event.spice_after[id];
-        const change = after - before;
-        const sign = change >= 0 ? "+" : "";
-        html += `<tr>
-            <td>${esc(id)}</td>
-            <td>${before.toLocaleString()}</td>
-            <td>${after.toLocaleString()}</td>
-            <td>${sign}${change.toLocaleString()}</td>
-        </tr>`;
-    }
-    html += "</table>";
-
-    html += "<h4>Targeting</h4><table>";
-    html += "<tr><th>Attacker</th><th>Defender</th></tr>";
-    for (const [att, def_] of Object.entries(event.targeting)) {
-        html += `<tr><td>${esc(att)}</td><td>${esc(def_)}</td></tr>`;
-    }
-    html += "</table>";
-
-    html += "<h4>Battles</h4>";
-    for (const battle of event.battles) {
-        html += `<div class="battle-detail">`;
-        html += `<p><strong>${esc(battle.attackers.join(", "))} &rarr; ${esc(battle.defenders[0])}</strong>`;
-        html += ` | Outcome: ${esc(battle.outcome)}`;
-        html += ` | Theft: ${battle.theft_percentage}%</p>`;
-
-        const probs = battle.outcome_probabilities;
-        html += `<p class="probs">P(full)=${(probs.full_success * 100).toFixed(1)}%`;
-        html += ` P(partial)=${(probs.partial_success * 100).toFixed(1)}%`;
-        if (probs.custom !== undefined) {
-            html += ` P(custom)=${(probs.custom * 100).toFixed(1)}%`;
-        }
-        html += ` P(fail)=${(probs.fail * 100).toFixed(1)}%</p>`;
-
-        if (Object.keys(battle.transfers).length > 0) {
-            html += "<table><tr><th>Alliance</th><th>Transfer</th></tr>";
-            for (const [id, amount] of Object.entries(battle.transfers)) {
-                const sign = amount >= 0 ? "+" : "";
-                html += `<tr><td>${esc(id)}</td><td>${sign}${amount.toLocaleString()}</td></tr>`;
-            }
-            html += "</table>";
-        }
-        html += "</div>";
-    }
-
-    return html;
+.model-section[open] > summary {
+    border-bottom: 1px solid #e0e0e0;
+    border-radius: 4px 4px 0 0;
 }
 
-// --- Monte Carlo ---
-
-async function runMonteCarlo() {
-    const stateDict = JSON.parse(document.getElementById("state-textarea").value);
-    const modelDict = JSON.parse(document.getElementById("model-textarea").value);
-    const iterations = parseInt(document.getElementById("mc-iterations").value, 10) || 1000;
-    const baseSeed = parseInt(document.getElementById("mc-base-seed").value, 10) || 0;
-
-    setRunning(true);
-    const result = await PyBridge.runMonteCarlo(stateDict, modelDict, iterations, baseSeed);
-    setRunning(false);
-
-    if (!result.ok) {
-        showError(result.error);
-        return;
-    }
-
-    lastResult = result;
-    renderMonteCarloResults(result);
+.model-section > :not(summary) {
+    padding: 12px;
 }
 
-function renderMonteCarloResults(result) {
-    const container = document.getElementById("results-content");
-    const section = document.getElementById("results");
-    section.classList.remove("hidden");
-
-    const aids = Object.keys(result.tier_distribution);
-    aids.sort((a, b) => {
-        const aT1 = parseFloat(result.tier_distribution[a]["1"] || 0);
-        const bT1 = parseFloat(result.tier_distribution[b]["1"] || 0);
-        return bT1 - aT1;
-    });
-
-    let html = `<h3>Tier Distribution (${result.num_iterations} iterations)</h3>`;
-    html += "<table><tr><th>Alliance</th>";
-    for (let t = 1; t <= 5; t++) html += `<th>T${t}</th>`;
-    html += "</tr>";
-    for (const aid of aids) {
-        html += `<tr><td>${esc(aid)}</td>`;
-        const dist = result.tier_distribution[aid];
-        for (let t = 1; t <= 5; t++) {
-            const pct = (parseFloat(dist[String(t)] || 0) * 100).toFixed(1);
-            html += `<td>${pct}%</td>`;
-        }
-        html += "</tr>";
-    }
-    html += "</table>";
-
-    html += "<h3>Spice Statistics</h3>";
-    html += "<table><tr><th>Alliance</th><th>Mean</th><th>Median</th>";
-    html += "<th>Min</th><th>Max</th><th>P25</th><th>P75</th></tr>";
-    for (const aid of aids) {
-        const s = result.spice_stats[aid];
-        html += `<tr>
-            <td>${esc(aid)}</td>
-            <td>${s.mean.toLocaleString()}</td>
-            <td>${s.median.toLocaleString()}</td>
-            <td>${s.min.toLocaleString()}</td>
-            <td>${s.max.toLocaleString()}</td>
-            <td>${s.p25.toLocaleString()}</td>
-            <td>${s.p75.toLocaleString()}</td>
-        </tr>`;
-    }
-    html += "</table>";
-
-    html += '<div id="chart-section">';
-    html += '<h3>Tier Distribution</h3><canvas id="tier-chart"></canvas>';
-    html += '<h3>Spice Distribution</h3><canvas id="spice-chart"></canvas>';
-    html += "</div>";
-
-    container.innerHTML = html;
-
-    renderTierChart(aids, result.tier_distribution);
-    renderSpiceChart(aids, result.spice_stats);
+/* Form grid for inline controls */
+.form-grid {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 12px;
 }
 
-// --- Charts ---
-
-function renderTierChart(aids, tierDist) {
-    if (tierChartInstance) tierChartInstance.destroy();
-
-    const ctx = document.getElementById("tier-chart").getContext("2d");
-    const datasets = [];
-    const tierColors = ["#28a745", "#17a2b8", "#ffc107", "#fd7e14", "#dc3545"];
-
-    for (let t = 1; t <= 5; t++) {
-        datasets.push({
-            label: `Tier ${t}`,
-            data: aids.map(aid => parseFloat(tierDist[aid][String(t)] || 0) * 100),
-            backgroundColor: tierColors[t - 1],
-        });
-    }
-
-    tierChartInstance = new Chart(ctx, {
-        type: "bar",
-        data: { labels: aids, datasets },
-        options: {
-            responsive: true,
-            scales: {
-                x: { stacked: true },
-                y: { stacked: true, max: 100, title: { display: true, text: "%" } },
-            },
-        },
-    });
+.form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.9em;
+    font-weight: 500;
 }
 
-function renderSpiceChart(aids, spiceStats) {
-    if (spiceChartInstance) spiceChartInstance.destroy();
-
-    const ctx = document.getElementById("spice-chart").getContext("2d");
-
-    const datasets = [
-        {
-            label: "Min\u2013Max Range",
-            data: aids.map(aid => [spiceStats[aid].min, spiceStats[aid].max]),
-            backgroundColor: "rgba(54, 162, 235, 0.2)",
-            borderColor: "rgba(54, 162, 235, 1)",
-            borderWidth: 1,
-        },
-        {
-            label: "P25\u2013P75 Range",
-            data: aids.map(aid => [spiceStats[aid].p25, spiceStats[aid].p75]),
-            backgroundColor: "rgba(54, 162, 235, 0.5)",
-            borderColor: "rgba(54, 162, 235, 1)",
-            borderWidth: 1,
-        },
-        {
-            label: "Median",
-            data: aids.map(aid => spiceStats[aid].median),
-            type: "line",
-            borderColor: "#dc3545",
-            pointRadius: 6,
-            pointStyle: "rectRot",
-            showLine: false,
-        },
-    ];
-
-    spiceChartInstance = new Chart(ctx, {
-        type: "bar",
-        data: { labels: aids, datasets },
-        options: {
-            indexAxis: "y",
-            responsive: true,
-            scales: {
-                x: { title: { display: true, text: "Spice" } },
-            },
-        },
-    });
+.form-grid select,
+.form-grid input[type="number"] {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
 }
 
-// --- Event Handlers ---
-
-function setupEventHandlers() {
-    // State editor
-    document.getElementById("state-textarea").addEventListener("input", onStateInput);
-    document.getElementById("state-upload-btn").addEventListener("click", () => {
-        document.getElementById("state-file-input").click();
-    });
-    document.getElementById("state-file-input").addEventListener("change", (e) => {
-        readFileToTextarea(e.target.files[0], "state-textarea", validateState);
-    });
-
-    // Model editor — JSON textarea still gets direct input handler for JSON-view editing
-    document.getElementById("model-textarea").addEventListener("input", onModelInput);
-    document.getElementById("model-upload-btn").addEventListener("click", () => {
-        document.getElementById("model-file-input").click();
-    });
-    document.getElementById("model-file-input").addEventListener("change", (e) => {
-        readFileToTextarea(e.target.files[0], "model-textarea", () => {
-            syncJsonToForm();
-            validateModel();
-        });
-    });
-
-    // View toggle
-    document.getElementById("model-view-toggle").addEventListener("click", toggleModelView);
-
-    // CSV import
-    document.getElementById("csv-import-btn").addEventListener("click", () => {
-        document.getElementById("csv-file-input").click();
-    });
-    document.getElementById("csv-file-input").addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-            const result = PyBridge.importCsv(reader.result);
-            if (result.ok) {
-                document.getElementById("model-textarea").value =
-                    JSON.stringify(result.config, null, 2);
-                syncJsonToForm();
-                validateModel();
-            } else {
-                alert("CSV import error: " + result.error);
-            }
-        };
-        reader.readAsText(file);
-    });
-
-    // CSV template download
-    document.getElementById("csv-template-btn").addEventListener("click", () => {
-        if (!currentStateDict) return;
-        const result = PyBridge.generateTemplateCsv(currentStateDict, 6);
-        if (result.ok) {
-            downloadFile("spice_war_template.csv", result.csv, "text/csv");
-        } else {
-            alert("Template error: " + result.error);
-        }
-    });
-
-    // Run buttons
-    document.getElementById("run-single-btn").addEventListener("click", runSingle);
-    document.getElementById("run-mc-btn").addEventListener("click", runMonteCarlo);
-
-    // Export buttons
-    document.getElementById("download-results-btn").addEventListener("click", () => {
-        if (lastResult) {
-            downloadFile("spice_war_results.json",
-                JSON.stringify(lastResult, null, 2), "application/json");
-        }
-    });
-    document.getElementById("download-model-btn").addEventListener("click", () => {
-        const model = document.getElementById("model-textarea").value;
-        downloadFile("model_config.json", model, "application/json");
-    });
+/* Form tables */
+.form-table {
+    width: 100%;
+    margin: 0;
 }
 
-// --- Utilities ---
-
-function readFileToTextarea(file, textareaId, validateFn) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-        document.getElementById(textareaId).value = reader.result;
-        validateFn();
-    };
-    reader.readAsText(file);
+.form-table select {
+    width: 100%;
+    padding: 3px 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 13px;
 }
 
-function downloadFile(filename, content, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+/* Percentage inputs in outcome matrix */
+.pct-input {
+    width: 80px;
+    padding: 3px 6px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 13px;
+    text-align: right;
 }
 
-function showError(msg) {
-    const container = document.getElementById("results-content");
-    const section = document.getElementById("results");
-    section.classList.remove("hidden");
-    container.innerHTML = `<div class="error-msg">${esc(msg)}</div>`;
+/* Add/remove row buttons */
+.add-row-btn {
+    margin: 8px 12px;
+    padding: 4px 12px;
+    border: 1px dashed #aaa;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    color: #555;
+    font-size: 0.85em;
 }
 
-function esc(str) {
-    const div = document.createElement("div");
-    div.textContent = String(str);
-    return div.innerHTML;
+.add-row-btn:hover {
+    background: #f0f0f0;
+    border-color: #888;
 }
+
+.remove-row-btn {
+    border: none;
+    background: transparent;
+    color: #999;
+    cursor: pointer;
+    font-size: 1.2em;
+    padding: 2px 6px;
+}
+
+.remove-row-btn:hover {
+    color: #dc3545;
+}
+
+/* Event subsections within accordion panels */
+.event-subsection,
+.day-subsection {
+    margin-bottom: 12px;
+    padding: 0 12px 12px;
+}
+
+.event-subsection h4,
+.day-subsection h4 {
+    margin: 8px 0;
+    font-size: 0.95em;
+    color: #555;
+}
+
+/* Help text */
+.help-text {
+    font-size: 0.85em;
+    color: #888;
+    margin: 4px 12px 8px;
+}
+
+.muted {
+    color: #999;
+    font-style: italic;
+    padding: 12px;
+}
+
+/* View toggle button */
+.toggle-btn {
+    font-weight: 500;
+}
+
+/* Validation highlight on outcome rows */
+.validation-error {
+    background: #fff3f3;
+}
+
+.validation-error .pct-input {
+    border-color: #dc3545;
+}
+
+.validation-inline {
+    color: #dc3545;
+    font-size: 0.85em;
+    margin: 4px 12px;
+}
+
+/* State JSON toggle */
+#state-json-toggle {
+    margin-top: 8px;
+}
+
+#state-json-toggle summary {
+    cursor: pointer;
+    color: #555;
+    font-size: 0.9em;
+}
+```
+
+---
+
+## File Changes Summary
+
+| File | Change |
+|------|--------|
+| `web/index.html` | Restructure state section (wrap textarea in `<details>`), restructure model section (add `#model-form` div, view toggle button, move download button) |
+| `web/js/app.js` | Add form state (`modelFormData`, `modelViewMode`), form builders (sections 5a-5g), dropdown helpers, `collectFormData()`, `syncFormToJson()`/`syncJsonToForm()`, `toggleModelView()`, `attachFormHandlers()`, `handleAddRow()`, update init and event handlers |
+| `web/css/style.css` | Add accordion section styles, form-table/grid styles, percentage inputs, add/remove buttons, validation highlights, help text, view toggle, state JSON toggle |
+
+No changes to Python files. No new files created.
+
+---
+
+## Backward Compatibility
+
+All existing functionality is preserved. The raw JSON textarea remains accessible via the "Edit as JSON" toggle, and the state textarea is still fully functional inside its collapsible. Upload, CSV import, CSV template download, run single, and run Monte Carlo all work identically. Users who prefer raw JSON editing can toggle to it immediately and never interact with the form.
