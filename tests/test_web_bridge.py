@@ -49,7 +49,7 @@ def valid_state():
 def test_get_default_state_is_valid(default_state):
     result = validate_state(default_state)
     assert result["ok"] is True
-    assert len(result["alliances"]) == 4
+    assert len(result["alliances"]) == 40
     assert len(result["event_schedule"]) == 4
 
 
@@ -158,7 +158,7 @@ def test_run_single_structure(default_state):
     assert "rankings" in result
     assert "event_history" in result
     assert len(result["event_history"]) == 4
-    for aid in ["Alpha", "Bravo", "Charlie", "Delta"]:
+    for aid in ["VON", "UTW", "Ghst", "SPXP"]:
         assert aid in result["final_spice"]
         assert aid in result["rankings"]
 
@@ -199,7 +199,7 @@ def test_run_monte_carlo_iteration_count(default_state):
 def test_run_monte_carlo_tier_sums(default_state):
     result = run_monte_carlo(default_state, {}, num_iterations=100)
     assert result["ok"] is True
-    for aid in ["Alpha", "Bravo", "Charlie", "Delta"]:
+    for aid in ["VON", "UTW", "Ghst", "SPXP"]:
         dist = result["tier_distribution"][aid]
         total = sum(float(dist[str(t)]) for t in range(1, 6))
         assert total == pytest.approx(1.0)
@@ -208,7 +208,7 @@ def test_run_monte_carlo_tier_sums(default_state):
 def test_run_monte_carlo_spice_stats_structure(default_state):
     result = run_monte_carlo(default_state, {}, num_iterations=50)
     assert result["ok"] is True
-    for aid in ["Alpha", "Bravo", "Charlie", "Delta"]:
+    for aid in ["VON", "UTW", "Ghst", "SPXP"]:
         stats = result["spice_stats"][aid]
         assert set(stats.keys()) == {"mean", "median", "min", "max", "p25", "p75"}
         assert stats["min"] <= stats["p25"] <= stats["median"] <= stats["p75"] <= stats["max"]

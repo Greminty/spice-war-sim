@@ -124,46 +124,123 @@ def _validate_model_dict(model_dict: dict, alliances: list[Alliance]) -> None:
 def get_default_state() -> dict:
     return {
         "alliances": [
-            {
-                "alliance_id": "Alpha",
-                "faction": "Sun",
-                "power": 15.0,
-                "starting_spice": 2_000_000,
-                "daily_rate": 50_000,
-            },
-            {
-                "alliance_id": "Bravo",
-                "faction": "Sun",
-                "power": 10.0,
-                "starting_spice": 1_500_000,
-                "daily_rate": 40_000,
-            },
-            {
-                "alliance_id": "Charlie",
-                "faction": "Moon",
-                "power": 12.0,
-                "starting_spice": 1_800_000,
-                "daily_rate": 45_000,
-            },
-            {
-                "alliance_id": "Delta",
-                "faction": "Moon",
-                "power": 8.0,
-                "starting_spice": 1_200_000,
-                "daily_rate": 35_000,
-            },
+            {"alliance_id": "VON", "faction": "Golden Tribe", "power": 19075548647, "starting_spice": 3970191, "daily_rate": 148953, "name": "Chosen", "server": "Warzone #1395"},
+            {"alliance_id": "UTW", "faction": "Golden Tribe", "power": 17711900592, "starting_spice": 3400783, "daily_rate": 149661, "name": "UTW", "server": "Warzone #1395"},
+            {"alliance_id": "hAnA", "faction": "Golden Tribe", "power": 11089698546, "starting_spice": 3316081, "daily_rate": 129140, "name": "Happy and New age", "server": "Warzone #1397"},
+            {"alliance_id": "RAG3", "faction": "Golden Tribe", "power": 17034821954, "starting_spice": 3170469, "daily_rate": 166290, "name": "Raging Legion", "server": "Warzone #1397"},
+            {"alliance_id": "PPLE", "faction": "Golden Tribe", "power": 14584581500, "starting_spice": 2842692, "daily_rate": 132784, "name": "Pukkas People", "server": "Warzone #1395"},
+            {"alliance_id": "BdE", "faction": "Golden Tribe", "power": 13431477273, "starting_spice": 2766161, "daily_rate": 114139, "name": "Big Dig Energy", "server": "Warzone #1395"},
+            {"alliance_id": "GDZO", "faction": "Golden Tribe", "power": 15541988443, "starting_spice": 2736721, "daily_rate": 151288, "name": "GodZofOlympuS", "server": "Warzone #1401"},
+            {"alliance_id": "DEED", "faction": "Golden Tribe", "power": 13589238775, "starting_spice": 2611014, "daily_rate": 150652, "name": "NICE", "server": "Warzone #1401"},
+            {"alliance_id": "TWAO", "faction": "Golden Tribe", "power": 15025271013, "starting_spice": 2486438, "daily_rate": 152739, "name": "TOGETHER WE ARE ONE", "server": "Warzone #1412"},
+            {"alliance_id": "USA5", "faction": "Golden Tribe", "power": 11666656368, "starting_spice": 2443794, "daily_rate": 136712, "name": "Americans United", "server": "Warzone #1397"},
+            {"alliance_id": "HULK", "faction": "Golden Tribe", "power": 10500670352, "starting_spice": 2275151, "daily_rate": 109291, "name": "HeroicUnity LastKill", "server": "Warzone #1395"},
+            {"alliance_id": "SPir", "faction": "Golden Tribe", "power": 9955939718, "starting_spice": 2266411, "daily_rate": 126027, "name": "The Shrimp pirates", "server": "Warzone #1395"},
+            {"alliance_id": "KAG3", "faction": "Golden Tribe", "power": 8415527016, "starting_spice": 2228445, "daily_rate": 105293, "name": "Khaos legion", "server": "Warzone #1397"},
+            {"alliance_id": "hvm6", "faction": "Golden Tribe", "power": 10273632363, "starting_spice": 2197895, "daily_rate": 113289, "name": "heavymetal666", "server": "Warzone #1397"},
+            {"alliance_id": "VNFs", "faction": "Golden Tribe", "power": 10041951216, "starting_spice": 2195782, "daily_rate": 120153, "name": "VN Fire Star", "server": "Warzone #1412"},
+            {"alliance_id": "Bo5S", "faction": "Golden Tribe", "power": 11083279867, "starting_spice": 1958989, "daily_rate": 119764, "name": "BOSS UNITED", "server": "Warzone #1412"},
+            {"alliance_id": "ZFKs", "faction": "Golden Tribe", "power": 11696793473, "starting_spice": 1866785, "daily_rate": 112865, "name": "The Unbroken", "server": "Warzone #1397"},
+            {"alliance_id": "DMUW", "faction": "Golden Tribe", "power": 9550866798, "starting_spice": 1859071, "daily_rate": 119764, "name": "天命戰鬥士", "server": "Warzone #1412"},
+            {"alliance_id": "LATZ", "faction": "Golden Tribe", "power": 9790611718, "starting_spice": 1831033, "daily_rate": 112334, "name": "Elite Origins", "server": "Warzone #1401"},
+            {"alliance_id": "AR35", "faction": "Golden Tribe", "power": 12109016820, "starting_spice": 1821065, "daily_rate": 90575, "name": "LEGION OF ARES", "server": "Warzone #1397"},
+            {"alliance_id": "Ghst", "faction": "Scarlet Legion", "power": 18304755237, "starting_spice": 3996182, "daily_rate": 157799, "name": "GhostSquad", "server": "Warzone #1386"},
+            {"alliance_id": "Hot", "faction": "Scarlet Legion", "power": 15509667992, "starting_spice": 3867131, "daily_rate": 146477, "name": "Hot", "server": "Warzone #1386"},
+            {"alliance_id": "SPXP", "faction": "Scarlet Legion", "power": 16562165406, "starting_spice": 3862691, "daily_rate": 154614, "name": "Sul Phoenix Prime", "server": "Warzone #1387"},
+            {"alliance_id": "j0y", "faction": "Scarlet Legion", "power": 14603203224, "starting_spice": 3399850, "daily_rate": 134464, "name": "Journey Of Yay", "server": "Warzone #1389"},
+            {"alliance_id": "sWAT", "faction": "Scarlet Legion", "power": 12856038089, "starting_spice": 3392834, "daily_rate": 121722, "name": "LandOfMisfits", "server": "Warzone #1386"},
+            {"alliance_id": "KORK", "faction": "Scarlet Legion", "power": 14076516849, "starting_spice": 3379764, "daily_rate": 139754, "name": "KOR킹덤", "server": "Warzone #1386"},
+            {"alliance_id": "BGs", "faction": "Scarlet Legion", "power": 11849958414, "starting_spice": 3058213, "daily_rate": 136512, "name": "Beginnerwarriors", "server": "Warzone #1390"},
+            {"alliance_id": "1CES", "faction": "Scarlet Legion", "power": 12846831524, "starting_spice": 2877444, "daily_rate": 123814, "name": "ICEBERG ALLIANCE", "server": "Warzone #1389"},
+            {"alliance_id": "VNSA", "faction": "Scarlet Legion", "power": 11707788035, "starting_spice": 2869544, "daily_rate": 133615, "name": "VictoryAndStayAllied", "server": "Warzone #1389"},
+            {"alliance_id": "STrH", "faction": "Scarlet Legion", "power": 9645958335, "starting_spice": 2857933, "daily_rate": 111803, "name": "STAR HAVEN", "server": "Warzone #1390"},
+            {"alliance_id": "fabl", "faction": "Scarlet Legion", "power": 12084632146, "starting_spice": 2819719, "daily_rate": 107416, "name": "TEAM仕事人", "server": "Warzone #1390"},
+            {"alliance_id": "HOpE", "faction": "Scarlet Legion", "power": 8661455980, "starting_spice": 2789561, "daily_rate": 115968, "name": "HeartOfPeaceEnergy", "server": "Warzone #1389"},
+            {"alliance_id": "fate", "faction": "Scarlet Legion", "power": 13861525348, "starting_spice": 2755680, "daily_rate": 119082, "name": "fate united", "server": "Warzone #1386"},
+            {"alliance_id": "ICG0", "faction": "Scarlet Legion", "power": 9862550440, "starting_spice": 2700032, "daily_rate": 133863, "name": "いちご", "server": "Warzone #1390"},
+            {"alliance_id": "NexA", "faction": "Scarlet Legion", "power": 16757937967, "starting_spice": 2682364, "daily_rate": 143222, "name": "Next Age", "server": "Warzone #1387"},
+            {"alliance_id": "LoFi", "faction": "Scarlet Legion", "power": 9267253950, "starting_spice": 2583681, "daily_rate": 123974, "name": "LoFi Land", "server": "Warzone #1389"},
+            {"alliance_id": "DNEX", "faction": "Scarlet Legion", "power": 11824278763, "starting_spice": 2529356, "daily_rate": 131172, "name": "Dream Nexus", "server": "Warzone #1390"},
+            {"alliance_id": "SPXR", "faction": "Scarlet Legion", "power": 12597390606, "starting_spice": 2523800, "daily_rate": 111308, "name": "Sul Phoenix Rising", "server": "Warzone #1387"},
+            {"alliance_id": "MY81", "faction": "Scarlet Legion", "power": 6842480858, "starting_spice": 2461928, "daily_rate": 108761, "name": "VNTG", "server": "Warzone #1389"},
+            {"alliance_id": "LE01", "faction": "Scarlet Legion", "power": 13696552623, "starting_spice": 2441328, "daily_rate": 113651, "name": "Lion Empire Order", "server": "Warzone #1387"},
         ],
         "event_schedule": [
-            {"attacker_faction": "Sun", "day": "wednesday", "days_before": 21},
-            {"attacker_faction": "Moon", "day": "saturday", "days_before": 18},
-            {"attacker_faction": "Sun", "day": "wednesday", "days_before": 14},
-            {"attacker_faction": "Moon", "day": "saturday", "days_before": 11},
+            {"attacker_faction": "Golden Tribe", "day": "wednesday", "days_before": 4},
+            {"attacker_faction": "Scarlet Legion", "day": "saturday", "days_before": 3},
+            {"attacker_faction": "Scarlet Legion", "day": "wednesday", "days_before": 4},
+            {"attacker_faction": "Golden Tribe", "day": "saturday", "days_before": 3},
         ],
     }
 
 
 def get_default_model_config() -> dict:
-    return {}
+    return {
+        "random_seed": 42,
+
+        "targeting_strategy": "expected_value",
+
+        "faction_targeting_strategy": {
+            "Scarlet Legion": "highest_spice"
+        },
+
+        "default_targets": {
+            "VON": {"strategy": "expected_value"},
+            "Ghst": {"target": "VON"}
+        },
+
+        "event_targets": {
+            "1": {
+                "UTW": "Ghst",
+                "RAG3": {"strategy": "highest_spice"}
+            },
+            "3": {
+                "SPXP": "UTW",
+                "NexA": "VON"
+            }
+        },
+
+        "event_reinforcements": {
+            "1": {
+                "hAnA": "Ghst"
+            }
+        },
+
+        "battle_outcome_matrix": {
+            "wednesday": {
+                "VON": {
+                    "Ghst": {"full_success": 0.55, "partial_success": 0.25},
+                    "MY81": {"full_success": 0.80, "partial_success": 0.12},
+                    "*": {"full_success": 0.65, "partial_success": 0.20}
+                },
+                "UTW": {
+                    "Ghst": {"full_success": 0.45, "partial_success": 0.30}
+                },
+                "SPXP": {
+                    "VON": {"full_success": 0.40, "partial_success": 0.30,
+                            "custom": 0.10, "custom_theft_percentage": 8.0}
+                },
+                "*": {
+                    "MY81": {"full_success": 0.75, "partial_success": 0.15}
+                }
+            },
+            "saturday": {
+                "Ghst": {
+                    "VON": {"full_success": 0.35, "partial_success": 0.30}
+                },
+                "NexA": {
+                    "*": {"full_success": 0.40, "partial_success": 0.25}
+                }
+            }
+        },
+
+        "damage_weights": {
+            "VON": 0.6,
+            "UTW": 0.4,
+            "Ghst": 0.55,
+            "SPXP": 0.45
+        }
+    }
 
 
 def validate_state(state_dict: dict) -> dict:
