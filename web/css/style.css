@@ -16,7 +16,7 @@ h1 {
 }
 
 .hidden {
-    display: none;
+    display: none !important;
 }
 
 /* Loading screen */
@@ -93,7 +93,8 @@ section {
 
 .editor-controls button,
 .result-controls button,
-.run-group button {
+.run-group button,
+#share-btn {
     padding: 6px 14px;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -105,7 +106,8 @@ section {
 
 .editor-controls button:hover,
 .result-controls button:hover,
-.run-group button:hover {
+.run-group button:hover,
+#share-btn:hover {
     background: #f0f0f0;
 }
 
@@ -342,6 +344,55 @@ summary {
     margin: 4px 12px;
 }
 
+.row-error-cell {
+    min-width: 140px;
+    vertical-align: top;
+}
+
+.row-error-msg {
+    color: #dc3545;
+    font-size: 0.8em;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.validation-error input,
+.validation-error select {
+    border-color: #dc3545;
+}
+
+/* Result filter */
+.result-filter {
+    margin: 8px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.result-filter span {
+    font-weight: 600;
+    font-size: 0.9em;
+}
+
+.filter-btn {
+    padding: 4px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.filter-btn.active {
+    background: #333;
+    color: #fff;
+    border-color: #333;
+}
+
+.filter-btn:hover:not(.active) {
+    background: #f0f0f0;
+}
+
 /* State JSON toggle */
 #state-json-toggle {
     margin-top: 8px;
@@ -351,6 +402,37 @@ summary {
     cursor: pointer;
     color: #555;
     font-size: 0.9em;
+}
+
+/* Notifications */
+.notification {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 0.9em;
+    z-index: 1000;
+    animation: fadeInOut 3s ease;
+}
+
+.notification-info {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.notification-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(-10px); }
+    10% { opacity: 1; transform: translateY(0); }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
 }
 
 /* Responsive */

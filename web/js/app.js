@@ -17,6 +17,8 @@ let modelViewMode = "form";
 let lastResult = null;
 let tierChartInstance = null;
 let spiceChartInstance = null;
+let formHandlersAttached = false;
+let resultFilter = "all";
 
 // --- Initialization ---
 
@@ -44,6 +46,33 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     updateRunButtons();
     setupEventHandlers();
+
+    // Load configuration from shared URL hash
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+        try {
+            const config = await decodeHashToConfig(hash);
+            if (config && config.v === 1) {
+                document.getElementById("state-textarea").value = JSON.stringify(config.state, null, 2);
+                validateState();
+
+                modelFormData = config.model;
+                document.getElementById("model-textarea").value = JSON.stringify(config.model, null, 2);
+                buildModelForm();
+                validateModel();
+
+                if (config.seed != null) {
+                    document.getElementById("single-seed").value = config.seed;
+                }
+                document.getElementById("mc-iterations").value = config.mcIterations || 1000;
+                document.getElementById("mc-base-seed").value = config.mcBaseSeed || 0;
+
+                showNotification("Configuration loaded from shared URL");
+            }
+        } catch {
+            // Invalid hash — silently ignore
+        }
+    }
 });
 
 // --- State Validation ---
@@ -185,6 +214,7 @@ function buildModelForm() {
 
     container.innerHTML = html;
     attachFormHandlers();
+    initHeuristicPlaceholders();
 }
 
 // --- Section Builders ---
@@ -261,7 +291,7 @@ function buildDefaultTargets(alliances) {
     <details class="model-section">
         <summary>Default Targets</summary>
         <table class="form-table" id="default-targets-table">
-            <tr><th>Alliance</th><th>Type</th><th>Value</th><th></th></tr>
+            <tr><th>Alliance</th><th>Type</th><th>Value</th><th></th><th></th></tr>
             ${rows}
         </table>
         <button class="add-row-btn" data-action="add-default-target">+ Add default target</button>
@@ -287,6 +317,7 @@ function defaultTargetRow(aids, selectedAid, isPinned, target, strategy) {
             </span>
         </td>
         <td><button class="remove-row-btn" title="Remove">&times;</button></td>
+        <td class="row-error-cell"></td>
     </tr>`;
 }
 
@@ -316,7 +347,7 @@ function buildEventTargets(alliances, events) {
         <div class="event-subsection" data-event="${eventKey}">
             <h4>Event ${event.number} — ${esc(attackerFaction)} attacks (${esc(event.day)})</h4>
             <table class="form-table">
-                <tr><th>Alliance</th><th>Type</th><th>Value</th><th></th></tr>
+                <tr><th>Alliance</th><th>Type</th><th>Value</th><th></th><th></th></tr>
                 ${rows}
             </table>
             <button class="add-row-btn" data-action="add-event-target" data-event="${eventKey}">
@@ -350,6 +381,7 @@ function eventTargetRow(attackerIds, defenderIds, selectedAid, isPinned, target,
             </span>
         </td>
         <td><button class="remove-row-btn" title="Remove">&times;</button></td>
+        <td class="row-error-cell"></td>
     </tr>`;
 }
 
@@ -426,6 +458,7 @@ function buildOutcomeMatrix(alliances, events) {
                     <td><input type="number" class="bom-custom-theft pct-input" value="${customTheft}"
                                min="0" max="100" step="0.1" placeholder="—"></td>
                     <td><button class="remove-row-btn" title="Remove">&times;</button></td>
+                    <td class="row-error-cell"></td>
                 </tr>`;
             }
         }
@@ -439,7 +472,7 @@ function buildOutcomeMatrix(alliances, events) {
                 <tr>
                     <th>Attacker</th><th>Defender</th>
                     <th>Full %</th><th>Partial %</th>
-                    <th>Custom %</th><th>Custom Theft %</th><th></th>
+                    <th>Custom %</th><th>Custom Theft %</th><th></th><th></th>
                 </tr>
                 ${rows}
             </table>
@@ -464,6 +497,66 @@ function validateOutcomeRow(full, partial, custom) {
     return null;
 }
 
+function validateOutcomeRowFull(row) {
+    const errors = [];
+    const fullVal = row.querySelector(".bom-full").value;
+    const partialVal = row.querySelector(".bom-partial").value;
+    const customVal = row.querySelector(".bom-custom").value;
+    const customTheftVal = row.querySelector(".bom-custom-theft").value;
+
+    const full = parseFloat(fullVal);
+    const partial = parseFloat(partialVal);
+    const custom = parseFloat(customVal);
+    const customTheft = parseFloat(customTheftVal);
+
+    if (fullVal !== "" && isNaN(full)) {
+        errors.push("Full % must be a number");
+    }
+    if (partialVal !== "" && isNaN(partial)) {
+        errors.push("Partial % must be a number");
+    }
+
+    const pctFields = [
+        [fullVal, full], [partialVal, partial],
+        [customVal, custom], [customTheftVal, customTheft],
+    ];
+    for (const [raw, num] of pctFields) {
+        if (raw !== "" && !isNaN(num) && (num < 0 || num > 100)) {
+            errors.push("Percentages must be between 0 and 100");
+            break;
+        }
+    }
+
+    const hasCustom = customVal !== "" && !isNaN(custom);
+    const hasCustomTheft = customTheftVal !== "" && !isNaN(customTheft);
+    if (hasCustom !== hasCustomTheft) {
+        errors.push("Custom % and Custom Theft % must both be set");
+    }
+
+    const fVal = (fullVal !== "" && !isNaN(full)) ? full : 0;
+    const pVal = (partialVal !== "" && !isNaN(partial)) ? partial : 0;
+    const cVal = (customVal !== "" && !isNaN(custom)) ? custom : 0;
+    if (fVal + pVal + cVal > 100) {
+        errors.push("Probabilities exceed 100%");
+    }
+
+    return errors;
+}
+
+function validateDamageWeightRow(row) {
+    const errors = [];
+    const weightVal = row.querySelector(".dw-weight").value;
+    const weight = parseFloat(weightVal);
+
+    if (weightVal === "" || isNaN(weight)) {
+        errors.push("Weight must be a number");
+    } else if (weight < 0 || weight > 1) {
+        errors.push("Weight must be between 0 and 1");
+    }
+
+    return errors;
+}
+
 function buildDamageWeights(alliances) {
     const dw = modelFormData.damage_weights || {};
     const aids = alliances.map(a => a.id);
@@ -476,6 +569,7 @@ function buildDamageWeights(alliances) {
             <td><input type="number" class="dw-weight" value="${weight}"
                        min="0" max="1" step="0.05"></td>
             <td><button class="remove-row-btn" title="Remove">&times;</button></td>
+            <td class="row-error-cell"></td>
         </tr>`;
     }
 
@@ -485,7 +579,7 @@ function buildDamageWeights(alliances) {
         <p class="help-text">Only relevant when multiple attackers target the same defender.
             Weights are normalized to sum to 1.</p>
         <table class="form-table" id="damage-weights-table">
-            <tr><th>Alliance</th><th>Weight</th><th></th></tr>
+            <tr><th>Alliance</th><th>Weight</th><th></th><th></th></tr>
             ${rows}
         </table>
         <button class="add-row-btn" data-action="add-damage-weight">+ Add</button>
@@ -527,9 +621,80 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+// --- Heuristic Probability Hints ---
+
+function getAlliancePower() {
+    if (!currentStateDict) return {};
+    const power = {};
+    for (const a of currentStateDict.alliances) {
+        power[a.alliance_id] = a.power;
+    }
+    return power;
+}
+
+function computeHeuristicHints(attackerId, defenderId, day) {
+    const power = getAlliancePower();
+    const aPower = power[attackerId];
+    const dPower = power[defenderId];
+    if (!aPower || !dPower) return null;
+
+    const ratio = aPower / dPower;
+    let full, cumulativePartial;
+
+    if (day === "wednesday") {
+        full = Math.max(0, Math.min(1, 2.5 * ratio - 2.0));
+        cumulativePartial = Math.max(0, Math.min(1, 1.75 * ratio - 0.9));
+    } else {
+        full = Math.max(0, Math.min(1, 3.25 * ratio - 3.0));
+        cumulativePartial = Math.max(0, Math.min(1, 1.75 * ratio - 1.1));
+    }
+
+    const partial = Math.max(0, cumulativePartial - full);
+    return {
+        full: Math.round(full * 100),
+        partial: Math.round(partial * 100),
+    };
+}
+
+function updateHeuristicPlaceholders(row, day) {
+    const attacker = row.querySelector(".bom-attacker").value;
+    const defender = row.querySelector(".bom-defender").value;
+    const fullInput = row.querySelector(".bom-full");
+    const partialInput = row.querySelector(".bom-partial");
+
+    if (attacker === "*" || defender === "*") {
+        fullInput.placeholder = "";
+        partialInput.placeholder = "";
+        return;
+    }
+
+    const hints = computeHeuristicHints(attacker, defender, day);
+    if (hints) {
+        fullInput.placeholder = `~${hints.full}`;
+        partialInput.placeholder = `~${hints.partial}`;
+    } else {
+        fullInput.placeholder = "";
+        partialInput.placeholder = "";
+    }
+}
+
+function initHeuristicPlaceholders() {
+    const daySections = document.querySelectorAll(".day-subsection");
+    for (const section of daySections) {
+        const day = section.dataset.day;
+        const rows = section.querySelectorAll(".dynamic-row");
+        for (const row of rows) {
+            updateHeuristicPlaceholders(row, day);
+        }
+    }
+}
+
 // --- Form Event Handling ---
 
 function attachFormHandlers() {
+    if (formHandlersAttached) return;
+    formHandlersAttached = true;
+
     const form = document.getElementById("model-form");
 
     form.addEventListener("input", () => {
@@ -543,6 +708,12 @@ function attachFormHandlers() {
             const row = e.target.closest("tr");
             row.querySelector(".dt-pin-value").classList.toggle("hidden", e.target.value !== "pin");
             row.querySelector(".dt-strategy-value").classList.toggle("hidden", e.target.value === "pin");
+        }
+        // Update heuristic placeholders when attacker/defender changes
+        if (e.target.classList.contains("bom-attacker") || e.target.classList.contains("bom-defender")) {
+            const row = e.target.closest("tr");
+            const daySection = row.closest(".day-subsection");
+            if (daySection) updateHeuristicPlaceholders(row, daySection.dataset.day);
         }
         collectFormData();
         scheduleModelValidation();
@@ -616,6 +787,7 @@ function handleAddRow(button) {
                 <td><input type="number" class="bom-custom pct-input" value="" min="0" max="100" step="0.1" placeholder="—"></td>
                 <td><input type="number" class="bom-custom-theft pct-input" value="" min="0" max="100" step="0.1" placeholder="—"></td>
                 <td><button class="remove-row-btn" title="Remove">&times;</button></td>
+                <td class="row-error-cell"></td>
             </tr>`;
             break;
         }
@@ -625,12 +797,19 @@ function handleAddRow(button) {
                 <td>${allianceDropdown(aids, aids[0], "dw-alliance")}</td>
                 <td><input type="number" class="dw-weight" value="0.5" min="0" max="1" step="0.05"></td>
                 <td><button class="remove-row-btn" title="Remove">&times;</button></td>
+                <td class="row-error-cell"></td>
             </tr>`;
             break;
     }
 
     if (newRow && table) {
         table.querySelector("tr:last-child").insertAdjacentHTML("afterend", newRow);
+        // Update heuristic placeholders on newly added outcome rows
+        if (action === "add-outcome-row") {
+            const addedRow = table.querySelector("tr:last-child");
+            const daySection = addedRow.closest(".day-subsection");
+            if (daySection) updateHeuristicPlaceholders(addedRow, daySection.dataset.day);
+        }
         collectFormData();
         scheduleModelValidation();
     }
@@ -664,8 +843,19 @@ function collectFormData() {
     // Default targets
     const dtRows = document.querySelectorAll('#default-targets-table .dynamic-row');
     const dt = {};
+    const dtSeen = new Set();
     for (const row of dtRows) {
         const aid = row.querySelector(".dt-alliance").value;
+        const errorCell = row.querySelector(".row-error-cell");
+        if (dtSeen.has(aid)) {
+            row.classList.add("validation-error");
+            if (errorCell) errorCell.textContent = "Duplicate alliance \u2014 only the last entry will apply";
+        } else {
+            row.classList.remove("validation-error");
+            if (errorCell) errorCell.textContent = "";
+        }
+        dtSeen.add(aid);
+
         const type = row.querySelector(".dt-type").value;
         if (type === "pin") {
             dt[aid] = { target: row.querySelector(".dt-target").value };
@@ -683,8 +873,19 @@ function collectFormData() {
         const eventKey = btn.dataset.event;
         const rows = btn.parentElement.querySelectorAll('.dynamic-row');
         const overrides = {};
+        const etSeen = new Set();
         for (const row of rows) {
             const aid = row.querySelector(".et-alliance")?.value;
+            const errorCell = row.querySelector(".row-error-cell");
+            if (etSeen.has(aid)) {
+                row.classList.add("validation-error");
+                if (errorCell) errorCell.textContent = "Duplicate alliance \u2014 only the last entry will apply";
+            } else {
+                row.classList.remove("validation-error");
+                if (errorCell) errorCell.textContent = "";
+            }
+            etSeen.add(aid);
+
             const type = row.querySelector(".dt-type")?.value;
             if (type === "pin") {
                 const target = row.querySelector(".et-target")?.value;
@@ -724,28 +925,40 @@ function collectFormData() {
         for (const row of rows) {
             const attacker = row.querySelector(".bom-attacker").value;
             const defender = row.querySelector(".bom-defender").value;
-            const full = parseFloat(row.querySelector(".bom-full").value);
-            const partial = parseFloat(row.querySelector(".bom-partial").value);
+            const fullVal = row.querySelector(".bom-full").value;
+            const partialVal = row.querySelector(".bom-partial").value;
             const customVal = row.querySelector(".bom-custom").value;
             const customTheftVal = row.querySelector(".bom-custom-theft").value;
+            const full = parseFloat(fullVal);
+            const partial = parseFloat(partialVal);
 
-            if (isNaN(full) || isNaN(partial)) continue;
+            // Inline validation
+            const rowErrors = validateOutcomeRowFull(row);
+            const errorCell = row.querySelector(".row-error-cell");
+            if (rowErrors.length > 0) {
+                row.classList.add("validation-error");
+                if (errorCell) errorCell.innerHTML = rowErrors.map(e => `<div class="row-error-msg">${esc(e)}</div>`).join("");
+            } else {
+                row.classList.remove("validation-error");
+                if (errorCell) errorCell.innerHTML = "";
+            }
 
-            const probs = {
-                full_success: full / 100,
-                partial_success: partial / 100,
-            };
+            // Skip truly empty rows (both full and partial blank)
+            if (fullVal === "" && partialVal === "") continue;
+
+            const probs = {};
+            if (!isNaN(full)) {
+                probs.full_success = full / 100;
+            }
+            if (!isNaN(partial)) {
+                probs.partial_success = partial / 100;
+            }
             if (customVal !== "" && !isNaN(parseFloat(customVal))) {
                 probs.custom = parseFloat(customVal) / 100;
             }
             if (customTheftVal !== "" && !isNaN(parseFloat(customTheftVal))) {
                 probs.custom_theft_percentage = parseFloat(customTheftVal);
             }
-
-            // Inline validation
-            const error = validateOutcomeRow(full, partial,
-                customVal !== "" ? parseFloat(customVal) : 0);
-            row.classList.toggle("validation-error", error != null);
 
             if (!dayMatrix[attacker]) dayMatrix[attacker] = {};
             dayMatrix[attacker][defender] = probs;
@@ -760,6 +973,17 @@ function collectFormData() {
     for (const row of dwRows) {
         const aid = row.querySelector(".dw-alliance").value;
         const weight = parseFloat(row.querySelector(".dw-weight").value);
+
+        const dwErrors = validateDamageWeightRow(row);
+        const dwErrorCell = row.querySelector(".row-error-cell");
+        if (dwErrors.length > 0) {
+            row.classList.add("validation-error");
+            if (dwErrorCell) dwErrorCell.innerHTML = dwErrors.map(e => `<div class="row-error-msg">${esc(e)}</div>`).join("");
+        } else {
+            row.classList.remove("validation-error");
+            if (dwErrorCell) dwErrorCell.innerHTML = "";
+        }
+
         if (!isNaN(weight)) dw[aid] = weight;
     }
     if (Object.keys(dw).length > 0) data.damage_weights = dw;
@@ -912,22 +1136,83 @@ async function runSingle() {
     renderSingleResults(result);
 }
 
+// --- Results Helpers ---
+
+function getAllianceFaction() {
+    if (!currentStateDict) return {};
+    const factions = {};
+    for (const a of currentStateDict.alliances) {
+        factions[a.alliance_id] = a.faction;
+    }
+    return factions;
+}
+
+function computeRanks(spiceMap) {
+    const sorted = Object.entries(spiceMap)
+        .sort((a, b) => b[1] - a[1]);
+    const ranks = {};
+    for (let i = 0; i < sorted.length; i++) {
+        ranks[sorted[i][0]] = i + 1;
+    }
+    return ranks;
+}
+
+function getAllianceBracket(eventBrackets) {
+    const bracketMap = {};
+    for (const [bracketNum, group] of Object.entries(eventBrackets)) {
+        const num = parseInt(bracketNum, 10);
+        const label = `${(num - 1) * 10 + 1}-${num * 10}`;
+        for (const aid of group.attackers) {
+            bracketMap[aid] = label;
+        }
+        for (const aid of group.defenders) {
+            bracketMap[aid] = label;
+        }
+    }
+    return bracketMap;
+}
+
+function getFilteredAlliances(filter) {
+    if (filter === "all" || !currentStateDict) return null;
+
+    const n = parseInt(filter.replace("top", ""), 10);
+    const byFaction = {};
+    for (const a of currentStateDict.alliances) {
+        if (!byFaction[a.faction]) byFaction[a.faction] = [];
+        byFaction[a.faction].push(a);
+    }
+
+    const allowed = new Set();
+    for (const faction of Object.keys(byFaction)) {
+        const sorted = byFaction[faction].sort((a, b) => b.power - a.power);
+        for (let i = 0; i < Math.min(n, sorted.length); i++) {
+            allowed.add(sorted[i].alliance_id);
+        }
+    }
+    return allowed;
+}
+
 function renderSingleResults(result) {
     const container = document.getElementById("results-content");
     const section = document.getElementById("results");
     section.classList.remove("hidden");
+    document.getElementById("result-filter").classList.remove("hidden");
 
-    const entries = Object.entries(result.final_spice).map(([id, spice]) => ({
-        id,
-        spice,
-        tier: result.rankings[id],
-    }));
+    const factions = getAllianceFaction();
+    const allowed = getFilteredAlliances(resultFilter);
+
+    const entries = Object.entries(result.final_spice)
+        .map(([id, spice]) => ({ id, spice, tier: result.rankings[id] }));
     entries.sort((a, b) => a.tier - b.tier || b.spice - a.spice);
 
     let html = `<h3>Final Rankings (seed: ${result.seed})</h3>`;
-    html += "<table><tr><th>Alliance</th><th>Tier</th><th>Final Spice</th></tr>";
-    for (const e of entries) {
+    html += "<table><tr><th>Rank</th><th>Faction</th><th>Alliance</th><th>Tier</th><th>Final Spice</th></tr>";
+    for (let i = 0; i < entries.length; i++) {
+        const e = entries[i];
+        if (allowed && !allowed.has(e.id)) continue;
         html += `<tr>
+            <td>${i + 1}</td>
+            <td>${esc(factions[e.id] || "")}</td>
             <td>${esc(e.id)}</td>
             <td>${e.tier}</td>
             <td>${e.spice.toLocaleString()}</td>
@@ -939,40 +1224,58 @@ function renderSingleResults(result) {
     for (const event of result.event_history) {
         html += `<details>
             <summary>Event ${event.event_number}: ${esc(event.attacker_faction)} (${esc(event.day)})</summary>
-            ${renderEventDetail(event)}
+            ${renderEventDetail(event, allowed)}
         </details>`;
     }
 
     container.innerHTML = html;
 }
 
-function renderEventDetail(event) {
+function renderEventDetail(event, allowed) {
+    const factions = getAllianceFaction();
+    const beforeRanks = computeRanks(event.spice_before);
+    const afterRanks = computeRanks(event.spice_after);
+    const bracketMap = event.brackets ? getAllianceBracket(event.brackets) : {};
     let html = "";
 
     html += "<h4>Spice</h4><table>";
-    html += "<tr><th>Alliance</th><th>Before</th><th>After</th><th>Change</th></tr>";
+    html += "<tr><th>Faction</th><th>Alliance</th><th>Before Rank</th><th>Before</th>"
+          + "<th>After</th><th>After Rank</th><th>Change</th></tr>";
     for (const [id, before] of Object.entries(event.spice_before)) {
+        if (allowed && !allowed.has(id)) continue;
         const after = event.spice_after[id];
         const change = after - before;
         const sign = change >= 0 ? "+" : "";
         html += `<tr>
+            <td>${esc(factions[id] || "")}</td>
             <td>${esc(id)}</td>
+            <td>${beforeRanks[id]}</td>
             <td>${before.toLocaleString()}</td>
             <td>${after.toLocaleString()}</td>
+            <td>${afterRanks[id]}</td>
             <td>${sign}${change.toLocaleString()}</td>
         </tr>`;
     }
     html += "</table>";
 
     html += "<h4>Targeting</h4><table>";
-    html += "<tr><th>Attacker</th><th>Defender</th></tr>";
+    html += "<tr><th>Attacker</th><th>Attacker Bracket</th><th>Defender</th><th>Defender Bracket</th></tr>";
     for (const [att, def_] of Object.entries(event.targeting)) {
-        html += `<tr><td>${esc(att)}</td><td>${esc(def_)}</td></tr>`;
+        if (allowed && !allowed.has(att)) continue;
+        html += `<tr>
+            <td>${esc(att)}</td>
+            <td>${bracketMap[att] || "\u2014"}</td>
+            <td>${esc(def_)}</td>
+            <td>${bracketMap[def_] || "\u2014"}</td>
+        </tr>`;
     }
     html += "</table>";
 
     html += "<h4>Battles</h4>";
     for (const battle of event.battles) {
+        const battleAlliances = [...battle.attackers, ...battle.defenders];
+        if (allowed && !battleAlliances.some(id => allowed.has(id))) continue;
+
         html += `<div class="battle-detail">`;
         html += `<p><strong>${esc(battle.attackers.join(", "))} &rarr; ${esc(battle.defenders[0])}</strong>`;
         html += ` | Outcome: ${esc(battle.outcome)}`;
@@ -987,10 +1290,15 @@ function renderEventDetail(event) {
         html += ` P(fail)=${(probs.fail * 100).toFixed(1)}%</p>`;
 
         if (Object.keys(battle.transfers).length > 0) {
-            html += "<table><tr><th>Alliance</th><th>Transfer</th></tr>";
+            html += "<table><tr><th>Faction</th><th>Alliance</th><th>Transfer</th></tr>";
             for (const [id, amount] of Object.entries(battle.transfers)) {
+                if (allowed && !allowed.has(id)) continue;
                 const sign = amount >= 0 ? "+" : "";
-                html += `<tr><td>${esc(id)}</td><td>${sign}${amount.toLocaleString()}</td></tr>`;
+                html += `<tr>
+                    <td>${esc(factions[id] || "")}</td>
+                    <td>${esc(id)}</td>
+                    <td>${sign}${amount.toLocaleString()}</td>
+                </tr>`;
             }
             html += "</table>";
         }
@@ -1025,8 +1333,13 @@ function renderMonteCarloResults(result) {
     const container = document.getElementById("results-content");
     const section = document.getElementById("results");
     section.classList.remove("hidden");
+    document.getElementById("result-filter").classList.remove("hidden");
 
-    const aids = Object.keys(result.tier_distribution);
+    const factions = getAllianceFaction();
+    const allowed = getFilteredAlliances(resultFilter);
+
+    const allAids = Object.keys(result.tier_distribution);
+    const aids = allAids.filter(aid => !allowed || allowed.has(aid));
     aids.sort((a, b) => {
         const aT1 = parseFloat(result.tier_distribution[a]["1"] || 0);
         const bT1 = parseFloat(result.tier_distribution[b]["1"] || 0);
@@ -1034,11 +1347,11 @@ function renderMonteCarloResults(result) {
     });
 
     let html = `<h3>Tier Distribution (${result.num_iterations} iterations)</h3>`;
-    html += "<table><tr><th>Alliance</th>";
+    html += "<table><tr><th>Faction</th><th>Alliance</th>";
     for (let t = 1; t <= 5; t++) html += `<th>T${t}</th>`;
     html += "</tr>";
     for (const aid of aids) {
-        html += `<tr><td>${esc(aid)}</td>`;
+        html += `<tr><td>${esc(factions[aid] || "")}</td><td>${esc(aid)}</td>`;
         const dist = result.tier_distribution[aid];
         for (let t = 1; t <= 5; t++) {
             const pct = (parseFloat(dist[String(t)] || 0) * 100).toFixed(1);
@@ -1049,11 +1362,12 @@ function renderMonteCarloResults(result) {
     html += "</table>";
 
     html += "<h3>Spice Statistics</h3>";
-    html += "<table><tr><th>Alliance</th><th>Mean</th><th>Median</th>";
+    html += "<table><tr><th>Faction</th><th>Alliance</th><th>Mean</th><th>Median</th>";
     html += "<th>Min</th><th>Max</th><th>P25</th><th>P75</th></tr>";
     for (const aid of aids) {
         const s = result.spice_stats[aid];
         html += `<tr>
+            <td>${esc(factions[aid] || "")}</td>
             <td>${esc(aid)}</td>
             <td>${s.mean.toLocaleString()}</td>
             <td>${s.median.toLocaleString()}</td>
@@ -1150,6 +1464,87 @@ function renderSpiceChart(aids, spiceStats) {
     });
 }
 
+// --- Notifications ---
+
+function showNotification(message, type = "info") {
+    const existing = document.querySelector(".notification");
+    if (existing) existing.remove();
+
+    const el = document.createElement("div");
+    el.className = `notification notification-${type}`;
+    el.textContent = message;
+    document.body.appendChild(el);
+
+    setTimeout(() => el.remove(), 3000);
+}
+
+// --- Shareable URL ---
+
+async function encodeConfigToHash() {
+    const payload = {
+        v: 1,
+        state: JSON.parse(document.getElementById("state-textarea").value),
+        model: JSON.parse(document.getElementById("model-textarea").value),
+        seed: document.getElementById("single-seed").value || null,
+        mcIterations: parseInt(document.getElementById("mc-iterations").value, 10) || 1000,
+        mcBaseSeed: parseInt(document.getElementById("mc-base-seed").value, 10) || 0,
+    };
+
+    const json = JSON.stringify(payload);
+    const bytes = new TextEncoder().encode(json);
+
+    const cs = new CompressionStream("deflate");
+    const writer = cs.writable.getWriter();
+    writer.write(bytes);
+    writer.close();
+
+    const compressed = await new Response(cs.readable).arrayBuffer();
+    const compressedBytes = new Uint8Array(compressed);
+
+    let base64 = btoa(String.fromCharCode(...compressedBytes));
+    base64 = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+    return `v1:${base64}`;
+}
+
+async function decodeHashToConfig(hash) {
+    if (!hash || !hash.startsWith("v1:")) return null;
+
+    const base64url = hash.slice(3);
+    let base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+    while (base64.length % 4) base64 += "=";
+
+    const compressed = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+
+    const ds = new DecompressionStream("deflate");
+    const writer = ds.writable.getWriter();
+    writer.write(compressed);
+    writer.close();
+
+    const decompressed = await new Response(ds.readable).arrayBuffer();
+    const json = new TextDecoder().decode(decompressed);
+
+    return JSON.parse(json);
+}
+
+async function shareConfig() {
+    try {
+        const hash = await encodeConfigToHash();
+        const url = `${window.location.origin}${window.location.pathname}#${hash}`;
+
+        if (url.length > 8000) {
+            showNotification("Configuration too large to share via URL", "error");
+            return;
+        }
+
+        window.location.hash = hash;
+        await navigator.clipboard.writeText(url);
+        showNotification("Link copied to clipboard");
+    } catch (e) {
+        showNotification("Failed to generate share link: " + e.message, "error");
+    }
+}
+
 // --- Event Handlers ---
 
 function setupEventHandlers() {
@@ -1210,9 +1605,28 @@ function setupEventHandlers() {
         }
     });
 
+    // Filter buttons
+    document.getElementById("result-filter").addEventListener("click", (e) => {
+        if (!e.target.classList.contains("filter-btn")) return;
+        for (const btn of document.querySelectorAll(".filter-btn")) {
+            btn.classList.toggle("active", btn === e.target);
+        }
+        resultFilter = e.target.dataset.filter;
+        if (lastResult) {
+            if (lastResult.event_history) {
+                renderSingleResults(lastResult);
+            } else {
+                renderMonteCarloResults(lastResult);
+            }
+        }
+    });
+
     // Run buttons
     document.getElementById("run-single-btn").addEventListener("click", runSingle);
     document.getElementById("run-mc-btn").addEventListener("click", runMonteCarlo);
+
+    // Share button
+    document.getElementById("share-btn").addEventListener("click", shareConfig);
 
     // Export buttons
     document.getElementById("download-results-btn").addEventListener("click", () => {
