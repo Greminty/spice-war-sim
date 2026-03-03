@@ -393,6 +393,21 @@ summary {
     background: #f0f0f0;
 }
 
+/* Rank change indicators */
+.rank-up {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.rank-down {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.rank-same {
+    color: #999;
+}
+
 /* State JSON toggle */
 #state-json-toggle {
     margin-top: 8px;

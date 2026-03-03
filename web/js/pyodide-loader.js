@@ -50,7 +50,7 @@ const PyBridge = {
     init: initPyodide,
     isReady: () => bridgeReady,
     getDefaultState: () => callBridge("get_default_state"),
-    getDefaultModelConfig: () => callBridge("get_default_model_config"),
+    getDefaultModelConfig: (state) => callBridge("get_default_model_config", state || null),
     validateState: (state) => callBridge("validate_state", state),
     validateModelConfig: (model, state) => callBridge("validate_model_config", model, state),
     runSingle: (state, model, seed) => callBridgeAsync("run_single", state, model, seed),

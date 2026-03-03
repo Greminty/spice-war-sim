@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     validateState();
 
     // Load default model — populate both form and textarea
-    const defaultModel = PyBridge.getDefaultModelConfig();
+    const defaultModel = PyBridge.getDefaultModelConfig(defaultState);
     modelFormData = defaultModel;
     document.getElementById("model-textarea").value = JSON.stringify(defaultModel, null, 2);
     buildModelForm();
@@ -439,8 +439,10 @@ function buildOutcomeMatrix(alliances, events) {
 
         for (const [attacker, defenders] of Object.entries(dayMatrix)) {
             for (const [defender, probs] of Object.entries(defenders)) {
-                const full = (probs.full_success * 100).toFixed(1);
-                const partial = (probs.partial_success * 100).toFixed(1);
+                const full = probs.full_success != null
+                    ? (probs.full_success * 100).toFixed(1) : "";
+                const partial = probs.partial_success != null
+                    ? (probs.partial_success * 100).toFixed(1) : "";
                 const custom = probs.custom != null ? (probs.custom * 100).toFixed(1) : "";
                 const customTheft = probs.custom_theft_percentage != null
                     ? probs.custom_theft_percentage : "";
@@ -1157,6 +1159,15 @@ function computeRanks(spiceMap) {
     return ranks;
 }
 
+function rankChangeIndicator(beforeRank, afterRank) {
+    if (afterRank < beforeRank) {
+        return '<span class="rank-up">\u2191</span>';       // ↑ green
+    } else if (afterRank > beforeRank) {
+        return '<span class="rank-down">\u2193</span>';     // ↓ red
+    }
+    return '<span class="rank-same">\u2014</span>';         // — grey
+}
+
 function getAllianceBracket(eventBrackets) {
     const bracketMap = {};
     for (const [bracketNum, group] of Object.entries(eventBrackets)) {
@@ -1206,14 +1217,14 @@ function renderSingleResults(result) {
     entries.sort((a, b) => a.tier - b.tier || b.spice - a.spice);
 
     let html = `<h3>Final Rankings (seed: ${result.seed})</h3>`;
-    html += "<table><tr><th>Rank</th><th>Faction</th><th>Alliance</th><th>Tier</th><th>Final Spice</th></tr>";
+    html += "<table><tr><th>Faction</th><th>Alliance</th><th>Rank</th><th>Tier</th><th>Final Spice</th></tr>";
     for (let i = 0; i < entries.length; i++) {
         const e = entries[i];
         if (allowed && !allowed.has(e.id)) continue;
         html += `<tr>
-            <td>${i + 1}</td>
             <td>${esc(factions[e.id] || "")}</td>
             <td>${esc(e.id)}</td>
+            <td>${i + 1}</td>
             <td>${e.tier}</td>
             <td>${e.spice.toLocaleString()}</td>
         </tr>`;
@@ -1239,34 +1250,39 @@ function renderEventDetail(event, allowed) {
     let html = "";
 
     html += "<h4>Spice</h4><table>";
-    html += "<tr><th>Faction</th><th>Alliance</th><th>Before Rank</th><th>Before</th>"
-          + "<th>After</th><th>After Rank</th><th>Change</th></tr>";
-    for (const [id, before] of Object.entries(event.spice_before)) {
+    html += "<tr><th>Faction</th><th>Alliance</th><th>Before Rank</th><th>After Rank</th>"
+          + "<th>Before</th><th>After</th><th>Change</th></tr>";
+    const spiceEntries = Object.entries(event.spice_before)
+        .sort((a, b) => afterRanks[a[0]] - afterRanks[b[0]]);
+    for (const [id, before] of spiceEntries) {
         if (allowed && !allowed.has(id)) continue;
         const after = event.spice_after[id];
         const change = after - before;
         const sign = change >= 0 ? "+" : "";
+        const br = beforeRanks[id];
+        const ar = afterRanks[id];
         html += `<tr>
             <td>${esc(factions[id] || "")}</td>
             <td>${esc(id)}</td>
-            <td>${beforeRanks[id]}</td>
+            <td>${br}</td>
+            <td>${ar} ${rankChangeIndicator(br, ar)}</td>
             <td>${before.toLocaleString()}</td>
             <td>${after.toLocaleString()}</td>
-            <td>${afterRanks[id]}</td>
             <td>${sign}${change.toLocaleString()}</td>
         </tr>`;
     }
     html += "</table>";
 
     html += "<h4>Targeting</h4><table>";
-    html += "<tr><th>Attacker</th><th>Attacker Bracket</th><th>Defender</th><th>Defender Bracket</th></tr>";
+    html += "<tr><th>Bracket</th><th>Attacker</th><th>Attacker Rank</th><th>Defender</th><th>Defender Rank</th></tr>";
     for (const [att, def_] of Object.entries(event.targeting)) {
         if (allowed && !allowed.has(att)) continue;
         html += `<tr>
-            <td>${esc(att)}</td>
             <td>${bracketMap[att] || "\u2014"}</td>
+            <td>${esc(att)}</td>
+            <td>${beforeRanks[att] || "\u2014"}</td>
             <td>${esc(def_)}</td>
-            <td>${bracketMap[def_] || "\u2014"}</td>
+            <td>${beforeRanks[def_] || "\u2014"}</td>
         </tr>`;
     }
     html += "</table>";
@@ -1292,7 +1308,6 @@ function renderEventDetail(event, allowed) {
         if (Object.keys(battle.transfers).length > 0) {
             html += "<table><tr><th>Faction</th><th>Alliance</th><th>Transfer</th></tr>";
             for (const [id, amount] of Object.entries(battle.transfers)) {
-                if (allowed && !allowed.has(id)) continue;
                 const sign = amount >= 0 ? "+" : "";
                 html += `<tr>
                     <td>${esc(factions[id] || "")}</td>

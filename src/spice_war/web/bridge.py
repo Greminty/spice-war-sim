@@ -174,73 +174,45 @@ def get_default_state() -> dict:
     }
 
 
-def get_default_model_config() -> dict:
-    return {
-        "random_seed": 42,
+def get_default_model_config(state_dict: dict | None = None) -> dict:
+    config: dict = {"random_seed": 42}
 
-        "targeting_strategy": "expected_value",
+    if not state_dict:
+        return config
 
-        "faction_targeting_strategy": {
-            "Scarlet Legion": "highest_spice"
-        },
+    alliances = state_dict.get("alliances", [])
+    events = state_dict.get("event_schedule", [])
+    if not alliances or not events:
+        return config
 
-        "default_targets": {
-            "VON": {"strategy": "expected_value"},
-            "Ghst": {"target": "VON"}
-        },
+    # Find top alliance per faction by power
+    top_by_faction: dict[str, str] = {}
+    max_power: dict[str, int] = {}
+    for a in alliances:
+        faction = a.get("faction", "")
+        power = a.get("power", 0)
+        if faction not in max_power or power > max_power[faction]:
+            max_power[faction] = power
+            top_by_faction[faction] = a["alliance_id"]
 
-        "event_targets": {
-            "1": {
-                "UTW": "Ghst",
-                "RAG3": {"strategy": "highest_spice"}
-            },
-            "3": {
-                "SPXP": "UTW",
-                "NexA": "VON"
-            }
-        },
+    faction_list = list(top_by_faction.keys())
+    if len(faction_list) != 2:
+        return config
 
-        "event_reinforcements": {
-            "1": {
-                "hAnA": "Ghst"
-            }
-        },
+    top_a = top_by_faction[faction_list[0]]
+    top_b = top_by_faction[faction_list[1]]
 
-        "battle_outcome_matrix": {
-            "wednesday": {
-                "VON": {
-                    "Ghst": {"full_success": 0.55, "partial_success": 0.25},
-                    "MY81": {"full_success": 0.80, "partial_success": 0.12},
-                    "*": {"full_success": 0.65, "partial_success": 0.20}
-                },
-                "UTW": {
-                    "Ghst": {"full_success": 0.45, "partial_success": 0.30}
-                },
-                "SPXP": {
-                    "VON": {"full_success": 0.40, "partial_success": 0.30,
-                            "custom": 0.10, "custom_theft_percentage": 8.0}
-                },
-                "*": {
-                    "MY81": {"full_success": 0.75, "partial_success": 0.15}
-                }
-            },
-            "saturday": {
-                "Ghst": {
-                    "VON": {"full_success": 0.35, "partial_success": 0.30}
-                },
-                "NexA": {
-                    "*": {"full_success": 0.40, "partial_success": 0.25}
-                }
-            }
-        },
-
-        "damage_weights": {
-            "VON": 0.6,
-            "UTW": 0.4,
-            "Ghst": 0.55,
-            "SPXP": 0.45
+    # Build matrix for each unique day with empty probability objects
+    days = list(dict.fromkeys(e.get("day", "") for e in events))
+    matrix: dict = {}
+    for day in days:
+        matrix[day] = {
+            top_a: {top_b: {}},
+            top_b: {top_a: {}},
         }
-    }
+
+    config["battle_outcome_matrix"] = matrix
+    return config
 
 
 def validate_state(state_dict: dict) -> dict:
