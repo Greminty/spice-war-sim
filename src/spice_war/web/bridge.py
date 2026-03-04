@@ -317,6 +317,7 @@ def run_monte_carlo(
                 aid: result.spice_stats(aid)
                 for aid in result.tier_counts
             },
+            "targeting_matrix": result.targeting_matrix(),
             "raw_results": result.per_iteration,
         }
     except Exception as e:

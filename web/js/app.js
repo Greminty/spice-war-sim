@@ -1399,6 +1399,51 @@ function renderMonteCarloResults(result) {
     html += '<h3>Spice Distribution</h3><canvas id="spice-chart"></canvas>';
     html += "</div>";
 
+    if (result.targeting_matrix) {
+        const powerMap = {};
+        for (const a of currentStateDict.alliances) {
+            powerMap[a.alliance_id] = a.power;
+        }
+        const byPowerDesc = (a, b) => (powerMap[b] || 0) - (powerMap[a] || 0);
+
+        const eventNums = Object.keys(result.targeting_matrix).sort((a, b) => +a - +b);
+        for (const eventNum of eventNums) {
+            const eventData = result.targeting_matrix[eventNum];
+            const idx = parseInt(eventNum, 10) - 1;
+            const evCfg = currentStateDict.event_schedule[idx];
+
+            let attackers = Object.keys(eventData);
+            let defenders = new Set();
+            for (const att of attackers) {
+                for (const def_ of Object.keys(eventData[att])) defenders.add(def_);
+            }
+            defenders = [...defenders];
+
+            if (allowed) {
+                attackers = attackers.filter(a => allowed.has(a));
+                defenders = defenders.filter(d => allowed.has(d));
+            }
+            if (!attackers.length || !defenders.length) continue;
+
+            attackers.sort(byPowerDesc);
+            defenders.sort(byPowerDesc);
+
+            html += `<h3>Event ${esc(eventNum)} — ${esc(evCfg.attacker_faction)} attacks (${esc(evCfg.day)})</h3>`;
+            html += "<table><tr><th></th>";
+            for (const d of defenders) html += `<th>${esc(d)}</th>`;
+            html += "</tr>";
+            for (const att of attackers) {
+                html += `<tr><td>${esc(att)}</td>`;
+                for (const def_ of defenders) {
+                    const frac = (eventData[att] || {})[def_] || 0;
+                    html += `<td>${frac ? (frac * 100).toFixed(1) + "%" : ""}</td>`;
+                }
+                html += "</tr>";
+            }
+            html += "</table>";
+        }
+    }
+
     container.innerHTML = html;
 
     renderTierChart(aids, result.tier_distribution);

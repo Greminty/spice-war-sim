@@ -16,6 +16,7 @@ class MonteCarloResult:
     tier_counts: dict[str, Counter[int]] = field(default_factory=dict)
     spice_totals: dict[str, list[int]] = field(default_factory=dict)
     per_iteration: list[dict] = field(default_factory=list)
+    targeting_counts: dict[str, dict[str, Counter[str]]] = field(default_factory=dict)
 
     def tier_distribution(self, alliance_id: str) -> dict[int, float]:
         counts = self.tier_counts[alliance_id]
@@ -35,6 +36,17 @@ class MonteCarloResult:
 
     def rank_summary(self) -> dict[str, dict[int, float]]:
         return {aid: self.tier_distribution(aid) for aid in self.tier_counts}
+
+    def targeting_matrix(self) -> dict[str, dict[str, dict[str, float]]]:
+        matrix = {}
+        for event_num, attackers in self.targeting_counts.items():
+            matrix[event_num] = {}
+            for attacker_id, defender_counts in attackers.items():
+                matrix[event_num][attacker_id] = {
+                    def_id: count / self.num_iterations
+                    for def_id, count in defender_counts.items()
+                }
+        return matrix
 
     def most_likely_tier(self, alliance_id: str) -> int:
         counts = self.tier_counts[alliance_id]
@@ -64,6 +76,15 @@ def run_monte_carlo(
 
         model = ConfigurableModel(iter_config, alliances)
         war_result = simulate_war(alliances, event_schedule, model)
+
+        for event in war_result["event_history"]:
+            event_num = str(event["event_number"])
+            if event_num not in result.targeting_counts:
+                result.targeting_counts[event_num] = {}
+            for attacker_id, defender_id in event["targeting"].items():
+                if attacker_id not in result.targeting_counts[event_num]:
+                    result.targeting_counts[event_num][attacker_id] = Counter()
+                result.targeting_counts[event_num][attacker_id][defender_id] += 1
 
         for aid in alliance_ids:
             result.spice_totals[aid].append(war_result["final_spice"][aid])
