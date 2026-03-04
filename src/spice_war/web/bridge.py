@@ -18,6 +18,9 @@ _ALLOWED_MODEL_KEYS = {
     "targeting_strategy",
     "default_targets",
     "faction_targeting_strategy",
+    "targeting_temperature",
+    "power_noise",
+    "outcome_noise",
 }
 
 

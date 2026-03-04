@@ -31,6 +31,9 @@ def generate_template(
     # --- Scalars ---
     rows.append(["random_seed", "42"])
     rows.append(["targeting_strategy", "expected_value"])
+    rows.append(["targeting_temperature", "0"])
+    rows.append(["power_noise", "0"])
+    rows.append(["outcome_noise", "0"])
     rows.append([])
 
     # --- default_targets ---

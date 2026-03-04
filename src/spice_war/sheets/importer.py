@@ -9,7 +9,8 @@ from pathlib import Path
 _GOOGLE_SHEET_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9_-]+)/")
 _GRID_TITLE_RE = re.compile(r"^(\w+):\s+.+ \u2192 .+$")
 
-_SCALAR_KEYS = {"random_seed", "targeting_strategy"}
+_FLOAT_SCALAR_KEYS = {"targeting_temperature", "power_noise", "outcome_noise"}
+_SCALAR_KEYS = {"random_seed", "targeting_strategy"} | _FLOAT_SCALAR_KEYS
 _SECTION_HEADERS = {"default_targets", "event_targets", "battle_outcome_matrix"}
 
 
@@ -57,6 +58,8 @@ def import_from_csv(rows: list[list[str]]) -> dict:
             if value:
                 if cell_a == "random_seed":
                     result[cell_a] = int(value)
+                elif cell_a in _FLOAT_SCALAR_KEYS:
+                    result[cell_a] = float(value)
                 else:
                     result[cell_a] = value
             i += 1

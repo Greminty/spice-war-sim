@@ -104,3 +104,29 @@ class TestLoadModelConfig:
         path = _write_json(tmp_path, "model.json", {})
         config = load_model_config(path, {"a1"})
         assert config == {}
+
+    def test_mc_randomness_keys_accepted(self, tmp_path):
+        data = {
+            "targeting_temperature": 0.5,
+            "power_noise": 0.1,
+            "outcome_noise": 0.2,
+        }
+        path = _write_json(tmp_path, "model.json", data)
+        config = load_model_config(path, {"a1"})
+        assert config["targeting_temperature"] == 0.5
+        assert config["power_noise"] == 0.1
+        assert config["outcome_noise"] == 0.2
+
+    def test_mc_randomness_negative_rejected(self, tmp_path):
+        for key in ("targeting_temperature", "power_noise", "outcome_noise"):
+            data = {key: -0.1}
+            path = _write_json(tmp_path, "model.json", data)
+            with pytest.raises(ValidationError, match="non-negative"):
+                load_model_config(path, {"a1"})
+
+    def test_mc_randomness_non_numeric_rejected(self, tmp_path):
+        for key in ("targeting_temperature", "power_noise", "outcome_noise"):
+            data = {key: "high"}
+            path = _write_json(tmp_path, "model.json", data)
+            with pytest.raises(ValidationError, match="must be a number"):
+                load_model_config(path, {"a1"})

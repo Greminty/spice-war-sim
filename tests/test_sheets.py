@@ -83,6 +83,13 @@ class TestGenerateTemplate:
         # Only top 2 per faction
         assert target_alliances == ["A1", "A2", "B1", "B2"]
 
+    def test_mc_randomness_scalars_present(self, alliances, schedule):
+        rows = generate_template(alliances, schedule)
+        scalars = {r[0]: r[1] for r in rows if len(r) >= 2}
+        assert scalars.get("targeting_temperature") == "0"
+        assert scalars.get("power_noise") == "0"
+        assert scalars.get("outcome_noise") == "0"
+
     def test_descriptions_included(self, alliances, schedule):
         rows = generate_template(alliances, schedule)
         flat = "\n".join(",".join(r) for r in rows)
@@ -167,6 +174,18 @@ class TestImportFromCsv:
         result = import_from_csv(rows)
         assert result["random_seed"] == 42
         assert result["targeting_strategy"] == "expected_value"
+
+    def test_float_scalar_parsing(self):
+        rows = [
+            ["targeting_temperature", "0.5"],
+            ["power_noise", "0.1"],
+            ["outcome_noise", "0.25"],
+        ]
+        result = import_from_csv(rows)
+        assert result["targeting_temperature"] == 0.5
+        assert isinstance(result["targeting_temperature"], float)
+        assert result["power_noise"] == 0.1
+        assert result["outcome_noise"] == 0.25
 
     def test_default_targets_parsing(self):
         rows = [
@@ -308,6 +327,15 @@ class TestRoundTrip:
         # Check a specific heuristic value from "Wednesday: red → blue" grid
         # A1(300) vs B1(250): r=1.2, wed: 1.0 → 100% → 1.0
         assert model["battle_outcome_matrix"]["wednesday"]["A1"]["B1"]["full_success"] == 1.0
+
+    def test_mc_randomness_round_trip(self, alliances, schedule):
+        """Template → import preserves MC randomness scalars as floats."""
+        rows = generate_template(alliances, schedule, top_n=2)
+        model = import_from_csv(rows)
+        assert model["targeting_temperature"] == 0.0
+        assert model["power_noise"] == 0.0
+        assert model["outcome_noise"] == 0.0
+        assert isinstance(model["targeting_temperature"], float)
 
     def test_csv_serialization_round_trip(self, alliances, schedule):
         """Generate → write CSV → read CSV → import."""

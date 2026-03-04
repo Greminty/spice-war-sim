@@ -222,6 +222,9 @@ function buildModelForm() {
 function buildGeneralSettings() {
     const seed = modelFormData.random_seed ?? "";
     const strategy = modelFormData.targeting_strategy ?? "expected_value";
+    const targTemp = modelFormData.targeting_temperature ?? "";
+    const powerNoise = modelFormData.power_noise ?? "";
+    const outcomeNoise = modelFormData.outcome_noise ?? "";
 
     return `
     <details class="model-section" open>
@@ -238,6 +241,24 @@ function buildGeneralSettings() {
                     <option value="highest_spice" ${strategy === "highest_spice" ? "selected" : ""}>
                         highest_spice</option>
                 </select>
+            </label>
+            <label>Targeting Temperature
+                <span class="help-text">0 = deterministic, higher = more random target selection</span>
+                <input type="number" id="form-targeting-temp" value="${targTemp}"
+                       placeholder="0" min="0" step="0.05"
+                       data-field="targeting_temperature">
+            </label>
+            <label>Power Noise
+                <span class="help-text">Per-event power fluctuation range (e.g. 0.1 = \u00b110%)</span>
+                <input type="number" id="form-power-noise" value="${powerNoise}"
+                       placeholder="0" min="0" step="0.05"
+                       data-field="power_noise">
+            </label>
+            <label>Outcome Noise
+                <span class="help-text">Random offset range for battle outcome probabilities</span>
+                <input type="number" id="form-outcome-noise" value="${outcomeNoise}"
+                       placeholder="0" min="0" step="0.05"
+                       data-field="outcome_noise">
             </label>
         </div>
     </details>`;
@@ -830,6 +851,19 @@ function collectFormData() {
     const strategyVal = document.getElementById("form-strategy")?.value;
     if (strategyVal) {
         data.targeting_strategy = strategyVal;
+    }
+
+    // MC randomness parameters
+    for (const [id, key] of [
+        ["form-targeting-temp", "targeting_temperature"],
+        ["form-power-noise", "power_noise"],
+        ["form-outcome-noise", "outcome_noise"],
+    ]) {
+        const val = document.getElementById(id)?.value;
+        if (val !== "" && val != null) {
+            const num = parseFloat(val);
+            if (num > 0) data[key] = num;
+        }
     }
 
     // Faction targeting strategy

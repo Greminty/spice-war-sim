@@ -21,6 +21,9 @@ _ALLOWED_MODEL_KEYS = {
     "targeting_strategy",
     "default_targets",
     "faction_targeting_strategy",
+    "targeting_temperature",
+    "power_noise",
+    "outcome_noise",
 }
 
 _VALID_STRATEGIES = {"expected_value", "highest_spice"}
@@ -334,6 +337,15 @@ def _check_model_references(
                 f"faction_targeting_strategy[{faction_name}] must be one of "
                 f"{sorted(_VALID_STRATEGIES)}, got '{strat}'"
             )
+
+    # Check MC randomness parameters
+    for key in ("targeting_temperature", "power_noise", "outcome_noise"):
+        val = data.get(key)
+        if val is not None:
+            if not isinstance(val, (int, float)):
+                errors.append(f"'{key}' must be a number, got {type(val).__name__}")
+            elif val < 0:
+                errors.append(f"'{key}' must be non-negative, got {val}")
 
     # Check for competing wildcards in battle_outcome_matrix
     for day, attackers in matrix.items():
