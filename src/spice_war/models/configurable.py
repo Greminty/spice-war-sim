@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import random
 from collections import Counter
 
@@ -14,6 +15,52 @@ class ConfigurableModel(BattleModel):
         self.alliances = {a.alliance_id: a for a in alliances}
         seed = config.get("random_seed", 0)
         self.rng = random.Random(seed)
+
+        # MC randomness parameters
+        self.targeting_temperature = config.get("targeting_temperature", 0.0)
+        self.power_noise = config.get("power_noise", 0.0)
+        self.outcome_noise = config.get("outcome_noise", 0.0)
+
+        # Pre-generate per-pairing outcome offsets (deterministic from seed)
+        self._pairing_offsets: dict[tuple[str, str], dict[str, float]] = {}
+        if self.outcome_noise > 0:
+            self._generate_pairing_offsets()
+
+        # Per-event effective powers (populated via set_effective_powers)
+        self._effective_powers: dict[str, float] = {}
+
+    def _generate_pairing_offsets(self) -> None:
+        seed = self.config.get("random_seed", 0)
+        offset_rng = random.Random(seed + 1_000_000)
+        noise = self.outcome_noise
+        alliance_ids = sorted(self.alliances.keys())
+        for att_id in alliance_ids:
+            for def_id in alliance_ids:
+                if att_id == def_id:
+                    continue
+                self._pairing_offsets[(att_id, def_id)] = {
+                    "full_success": offset_rng.uniform(-noise, noise),
+                    "partial_success": offset_rng.uniform(-noise, noise),
+                    "custom": offset_rng.uniform(-noise, noise),
+                }
+
+    def set_effective_powers(self) -> None:
+        if self.power_noise <= 0:
+            self._effective_powers = {
+                aid: a.power for aid, a in self.alliances.items()
+            }
+            return
+        noise = self.power_noise
+        self._effective_powers = {}
+        for aid in sorted(self.alliances.keys()):
+            base = self.alliances[aid].power
+            u = self.rng.uniform(-noise, noise)
+            self._effective_powers[aid] = base * (1 + u)
+
+    def _get_power(self, alliance_id: str) -> float:
+        return self._effective_powers.get(
+            alliance_id, self.alliances[alliance_id].power
+        )
 
     # ── M1: Targeting ──────────────────────────────────────────────
 
@@ -50,7 +97,7 @@ class ConfigurableModel(BattleModel):
 
         # Phase 2: Run algorithms for non-pinned attackers
         targets = dict(pins)
-        algo_attackers.sort(key=lambda pair: pair[0].power, reverse=True)
+        algo_attackers.sort(key=lambda pair: self._get_power(pair[0].alliance_id), reverse=True)
         assigned: set[str] = set(pins.values())
 
         for attacker, strategy in algo_attackers:
@@ -128,6 +175,11 @@ class ConfigurableModel(BattleModel):
         matrix = self.config.get("battle_outcome_matrix", {})
         probs = self._lookup_or_heuristic(matrix, attacker, defender, state.day)
 
+        if self.outcome_noise > 0:
+            probs = self._apply_outcome_noise(
+                probs, attacker.alliance_id, defender.alliance_id
+            )
+
         defender_spice = state.current_spice[defender.alliance_id]
         building_count = calculate_building_count(defender_spice)
 
@@ -150,30 +202,77 @@ class ConfigurableModel(BattleModel):
 
         return esv
 
+    def _softmax_select(
+        self,
+        candidates: list[Alliance],
+        scores: dict[str, float],
+    ) -> Alliance:
+        if len(candidates) == 1:
+            return candidates[0]
+
+        T = self.targeting_temperature
+
+        # Normalize scores to 0–1 range
+        raw = [scores.get(c.alliance_id, 0.0) for c in candidates]
+        s_max = max(raw)
+        if s_max > 0:
+            normalized = [s / s_max for s in raw]
+        else:
+            # All zero — uniform selection
+            return self.rng.choice(candidates)
+
+        # Softmax with overflow protection
+        n_max = max(normalized)
+        exp_vals = [math.exp((s - n_max) / T) for s in normalized]
+        total = sum(exp_vals)
+        weights = [e / total for e in exp_vals]
+
+        # Weighted random selection
+        roll = self.rng.random()
+        cumulative = 0.0
+        for i, w in enumerate(weights):
+            cumulative += w
+            if roll < cumulative:
+                return candidates[i]
+        return candidates[-1]
+
     def _pick_esv_target(
         self,
         attacker: Alliance,
         available: list[Alliance],
         state: GameState,
     ) -> Alliance:
-        available_with_esv = [
-            (self._calculate_esv(attacker, d, state), d)
+        scores = {
+            d.alliance_id: self._calculate_esv(attacker, d, state)
             for d in available
-        ]
-        available_with_esv.sort(
-            key=lambda pair: (
-                -pair[0],
-                -state.current_spice[pair[1].alliance_id],
-                pair[1].alliance_id,
-            )
+        }
+
+        if self.targeting_temperature > 0:
+            return self._softmax_select(available, scores)
+
+        # Deterministic: sort by ESV desc, spice desc, id asc
+        available_sorted = sorted(
+            available,
+            key=lambda d: (
+                -scores[d.alliance_id],
+                -state.current_spice[d.alliance_id],
+                d.alliance_id,
+            ),
         )
-        return available_with_esv[0][1]
+        return available_sorted[0]
 
     def _pick_highest_spice_target(
         self,
         available: list[Alliance],
         state: GameState,
     ) -> Alliance:
+        if self.targeting_temperature > 0:
+            scores = {
+                d.alliance_id: float(state.current_spice[d.alliance_id])
+                for d in available
+            }
+            return self._softmax_select(available, scores)
+
         return max(
             available,
             key=lambda d: state.current_spice[d.alliance_id],
@@ -253,6 +352,10 @@ class ConfigurableModel(BattleModel):
             probs = self._lookup_or_heuristic(
                 matrix, attacker, primary_defender, day
             )
+            if self.outcome_noise > 0:
+                probs = self._apply_outcome_noise(
+                    probs, attacker.alliance_id, primary_defender.alliance_id
+                )
             probs_list.append(probs)
 
         if len(probs_list) == 1:
@@ -280,6 +383,22 @@ class ConfigurableModel(BattleModel):
                 combined["custom_theft_percentage"] = (
                     sum(theft_pcts) / len(theft_pcts)
                 )
+
+            # Clamp and renormalize the averaged result
+            combined["full_success"] = max(0.0, combined["full_success"])
+            combined["partial_success"] = max(0.0, combined["partial_success"])
+            if "custom" in combined:
+                combined["custom"] = max(0.0, combined["custom"])
+            non_fail = (
+                combined["full_success"]
+                + combined["partial_success"]
+                + combined.get("custom", 0.0)
+            )
+            if non_fail > 1.0:
+                combined["full_success"] /= non_fail
+                combined["partial_success"] /= non_fail
+                if "custom" in combined:
+                    combined["custom"] /= non_fail
 
         combined["fail"] = max(
             0.0,
@@ -358,7 +477,7 @@ class ConfigurableModel(BattleModel):
     def _heuristic_probabilities(
         self, attacker: Alliance, defender: Alliance, day: str
     ) -> dict[str, float]:
-        ratio = attacker.power / defender.power
+        ratio = self._get_power(attacker.alliance_id) / self._get_power(defender.alliance_id)
 
         if day == "wednesday":
             full = max(0.0, min(1.0, 2.5 * ratio - 2.0))
@@ -369,6 +488,34 @@ class ConfigurableModel(BattleModel):
 
         partial = max(0.0, cumulative_partial - full)
         return {"full_success": full, "partial_success": partial}
+
+    def _apply_outcome_noise(
+        self,
+        probs: dict[str, float],
+        attacker_id: str,
+        defender_id: str,
+    ) -> dict[str, float]:
+        offsets = self._pairing_offsets.get((attacker_id, defender_id))
+        if offsets is None:
+            return probs
+
+        result = dict(probs)
+
+        result["full_success"] = max(0.0, result["full_success"] + offsets["full_success"])
+        result["partial_success"] = max(0.0, result["partial_success"] + offsets["partial_success"])
+
+        if "custom" in result:
+            result["custom"] = max(0.0, result["custom"] + offsets["custom"])
+
+        # Renormalize if non-fail probabilities exceed 1
+        non_fail = result["full_success"] + result["partial_success"] + result.get("custom", 0.0)
+        if non_fail > 1.0:
+            result["full_success"] /= non_fail
+            result["partial_success"] /= non_fail
+            if "custom" in result:
+                result["custom"] /= non_fail
+
+        return result
 
     # ── M4: Damage Splits ──────────────────────────────────────────
 
@@ -394,7 +541,7 @@ class ConfigurableModel(BattleModel):
         else:
             weights = {}
             for a in attackers:
-                ratio = a.power / primary_defender.power
+                ratio = self._get_power(a.alliance_id) / self._get_power(primary_defender.alliance_id)
                 weights[a.alliance_id] = max(0.0, min(1.0, 1.5 * ratio - 1.0))
 
         total = sum(weights.values())

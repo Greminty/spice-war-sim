@@ -42,6 +42,9 @@ def simulate_war(
             alliances=alliances,
         )
 
+        if hasattr(model, "set_effective_powers"):
+            model.set_effective_powers()
+
         updated_spice, event_info = coordinate_event(
             state,
             event_config.attacker_faction,
