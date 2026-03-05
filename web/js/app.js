@@ -47,6 +47,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateRunButtons();
     setupEventHandlers();
 
+    // Quick-start guide: remember collapse state
+    const quickStart = document.getElementById("quick-start");
+    if (quickStart) {
+        if (localStorage.getItem("hideQuickStart") === "1") {
+            quickStart.removeAttribute("open");
+        }
+        quickStart.addEventListener("toggle", () => {
+            localStorage.setItem("hideQuickStart", quickStart.open ? "0" : "1");
+        });
+    }
+
     // Load configuration from shared URL hash
     const hash = window.location.hash.slice(1);
     if (hash) {
@@ -205,12 +216,15 @@ function buildModelForm() {
 
     let html = "";
     html += buildGeneralSettings();
+    html += buildEventTargets(alliances, events);
+    html += buildOutcomeMatrix(alliances, events);
+    html += '<details class="model-section advanced-settings">';
+    html += '<summary>Advanced Settings</summary>';
     html += buildFactionTargeting(alliances);
     html += buildDefaultTargets(alliances);
-    html += buildEventTargets(alliances, events);
     html += buildEventReinforcements(alliances, events);
-    html += buildOutcomeMatrix(alliances, events);
     html += buildDamageWeights(alliances);
+    html += '</details>';
 
     container.innerHTML = html;
     attachFormHandlers();
@@ -227,7 +241,7 @@ function buildGeneralSettings() {
     const outcomeNoise = modelFormData.outcome_noise ?? "";
 
     return `
-    <details class="model-section" open>
+    <details class="model-section key-section">
         <summary>General Settings</summary>
         <div class="form-grid">
             <label>Random Seed
@@ -235,6 +249,9 @@ function buildGeneralSettings() {
                        data-field="random_seed">
             </label>
             <label>Global Targeting Strategy
+                <span class="help-text">Fallback algorithm when no explicit target is set.
+                    <strong>Expected Value</strong> maximizes expected spice stolen;
+                    <strong>Highest Spice</strong> targets the richest defender.</span>
                 <select id="form-strategy" data-field="targeting_strategy">
                     <option value="expected_value" ${strategy === "expected_value" ? "selected" : ""}>
                         expected_value</option>
@@ -242,6 +259,9 @@ function buildGeneralSettings() {
                         highest_spice</option>
                 </select>
             </label>
+            <div class="help-text noise-note">These three settings only affect
+                <strong>Monte Carlo</strong> runs. Set all to 0 for fully
+                deterministic results.</div>
             <label>Targeting Temperature
                 <span class="help-text">0 = deterministic, higher = more random target selection</span>
                 <input type="number" id="form-targeting-temp" value="${targTemp}"
@@ -289,6 +309,9 @@ function buildFactionTargeting(alliances) {
     return `
     <details class="model-section">
         <summary>Faction Targeting Strategy</summary>
+        <p class="help-text">Override the global strategy for a specific faction.
+            Alliances in that faction use this algorithm unless they have an
+            explicit target.</p>
         <table class="form-table">
             <tr><th>Faction</th><th>Strategy</th></tr>
             ${rows}
@@ -311,6 +334,8 @@ function buildDefaultTargets(alliances) {
     return `
     <details class="model-section">
         <summary>Default Targets</summary>
+        <p class="help-text">Pin a specific target or strategy for an alliance
+            across all events. Overridden by any event-level target below.</p>
         <table class="form-table" id="default-targets-table">
             <tr><th>Alliance</th><th>Type</th><th>Value</th><th></th><th></th></tr>
             ${rows}
@@ -377,9 +402,27 @@ function buildEventTargets(alliances, events) {
     }
 
     return `
-    <details class="model-section">
+    <details class="model-section key-section" open>
         <summary>Event Targets</summary>
+        <p class="help-text">Pin a target for a specific alliance in a specific
+            event. Highest priority — overrides default targets and
+            faction/global strategies.</p>
         ${sections}
+        <details class="deep-dive">
+            <summary>How targeting resolution works</summary>
+            <ol>
+                <li><strong>Event target</strong> — checked first. If set for
+                    this alliance + event, use it.</li>
+                <li><strong>Default target</strong> — checked second. If set
+                    for this alliance, use it.</li>
+                <li><strong>Faction strategy</strong> — checked third. Uses the
+                    faction's algorithm if configured.</li>
+                <li><strong>Global strategy</strong> — final fallback.</li>
+            </ol>
+            <p class="help-text">Within each algorithm, alliances choose targets
+                in descending power order. Ties break by higher spice, then
+                alphabetical ID.</p>
+        </details>
     </details>`;
 }
 
@@ -489,8 +532,6 @@ function buildOutcomeMatrix(alliances, events) {
         sections += `
         <div class="day-subsection" data-day="${day}">
             <h4>${capitalize(day)} outcomes</h4>
-            <p class="help-text">Lookup priority: exact match &rarr; attacker wildcard &rarr;
-                defender wildcard &rarr; heuristic fallback</p>
             <table class="form-table outcome-table">
                 <tr>
                     <th>Attacker</th><th>Defender</th>
@@ -506,9 +547,35 @@ function buildOutcomeMatrix(alliances, events) {
     }
 
     return `
-    <details class="model-section">
-        <summary>Battle Outcome Matrix</summary>
+    <details class="model-section key-section" open>
+        <summary>Battle Outcomes</summary>
+        <p class="help-text">Set the probability (0\u2013100) of <strong>full success</strong>
+            and optionally <strong>partial success</strong> for each
+            attacker\u2013defender pairing and day. If you only enter full success,
+            partial is derived automatically. Fail is implicit (100% minus the
+            others). Leave fields blank to use the power-ratio heuristic
+            (shown as placeholder values).</p>
         ${sections}
+        <details class="deep-dive">
+            <summary>How battle outcomes and lookup priority work</summary>
+            <ul>
+                <li><strong>Full success</strong> \u2014 all buildings destroyed.
+                    Theft up to 30% of defender\u2019s spice.</li>
+                <li><strong>Partial success</strong> \u2014 side buildings only.
+                    Lower theft (5\u201320%).</li>
+                <li><strong>Custom</strong> \u2014 you specify the exact theft
+                    percentage directly.</li>
+                <li><strong>Fail</strong> (implicit) \u2014 the remaining probability
+                    after full, partial, and custom. No buildings destroyed, 0%
+                    theft.</li>
+            </ul>
+            <p class="help-text">When multiple attackers hit the same defender,
+                stolen spice is split by damage weights.</p>
+            <p class="help-text"><strong>Lookup priority:</strong> exact pairing &rarr;
+                attacker wildcard (*) &rarr; defender wildcard (*) &rarr; heuristic
+                fallback. Wildcards let you set a default for all opponents without
+                listing every pairing.</p>
+        </details>
     </details>`;
 }
 
@@ -1250,7 +1317,10 @@ function renderSingleResults(result) {
         .map(([id, spice]) => ({ id, spice, tier: result.rankings[id] }));
     entries.sort((a, b) => a.tier - b.tier || b.spice - a.spice);
 
-    let html = `<h3>Final Rankings (seed: ${result.seed})</h3>`;
+    let html = `<p class="help-text">Expand each event to see targeting decisions,
+        battle outcomes, and spice transfers. Rank arrows show movement from the
+        previous event.</p>`;
+    html += `<h3>Final Rankings (seed: ${result.seed})</h3>`;
     html += "<table><tr><th>Faction</th><th>Alliance</th><th>Rank</th><th>Tier</th><th>Final Spice</th></tr>";
     for (let i = 0; i < entries.length; i++) {
         const e = entries[i];
@@ -1395,7 +1465,12 @@ function renderMonteCarloResults(result) {
         return bT1 - aT1;
     });
 
-    let html = `<h3>Tier Distribution (${result.num_iterations} iterations)</h3>`;
+    let html = `<p class="help-text"><strong>Tier distribution</strong> shows the
+        % chance each alliance finishes in each tier (T1 = rank 1, T2 = ranks 2\u20133,
+        T3 = 4\u201310, T4 = 11\u201320, T5 = 21+). The <strong>targeting matrix</strong>
+        below shows how often each attacker targeted each defender across all
+        iterations.</p>`;
+    html += `<h3>Tier Distribution (${result.num_iterations} iterations)</h3>`;
     html += "<table><tr><th>Faction</th><th>Alliance</th>";
     for (let t = 1; t <= 5; t++) html += `<th>T${t}</th>`;
     html += "</tr>";

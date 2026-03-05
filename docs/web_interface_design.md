@@ -385,8 +385,10 @@ Replaced the raw JSON textarea with structured accordion sections:
 - **Default Targets**: dynamic add/remove rows with alliance dropdowns
 - **Event Targets**: per-event sub-sections with attacker/defender selectors
 - **Event Reinforcements**: per-event assignment rows
-- **Battle Outcome Matrix**: grouped by day, percentage inputs, inline probability sum validation, heuristic placeholder hints
+- **Battle Outcomes**: grouped by day, percentage inputs, inline probability sum validation, heuristic placeholder hints
 - **Damage Weights**: per-alliance weight inputs
+
+The three key sections (General Settings, Event Targets, Battle Outcomes) appear at the top level. Secondary sections (Faction Targeting Strategy, Default Targets, Event Reinforcements, Damage Weights) are grouped inside a collapsed **Advanced Settings** accordion. Event Targets and Battle Outcomes default to open; General Settings defaults to collapsed.
 
 A "Edit as JSON" / "Back to form" toggle provides bi-directional sync between form and JSON textarea. Alliance dropdowns auto-populate from validated state data.
 
@@ -429,3 +431,11 @@ Alliances and Event Schedule summary tables wrapped in `<details>` elements. All
 ### Dynamic Default Model Config (0012)
 
 `get_default_model_config()` accepts the state dict and generates a minimal model config with cross-faction matchup rows (top alliance per faction), so heuristic probability placeholder hints display immediately.
+
+### In-Page Help Text (0017)
+
+A collapsible **"How to Use This Tool"** quick-start guide at the top of the page outlines the three-step workflow: set targeting, set battle outcomes, run. Collapse state persists via localStorage.
+
+Key model config sections (General Settings, Event Targets, Battle Outcomes) are visually highlighted with a blue left-border accent. Each section includes a short `.help-text` blurb below its heading. Two collapsible deep-dives provide additional detail: "How targeting resolution works" (inside Event Targets) explains the 4-level priority chain, and "How battle outcomes and lookup priority work" (inside Battle Outcomes) explains outcome levels, theft ranges, and wildcard lookup order.
+
+Run controls and results sections include brief contextual help text distinguishing single run vs Monte Carlo and explaining how to read the output.
