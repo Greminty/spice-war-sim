@@ -24,6 +24,10 @@
     {"alliance_id":"D2fu","faction":"Scarlet Legion","power":9045856688,"starting_spice":2503495,"daily_rate":130000,"name":"Fated","server":"Warzone #1386"},
     {"alliance_id":"MY81","faction":"Scarlet Legion","power":6842480858,"starting_spice":2486679,"daily_rate":108761,"name":"VNTG","server":"Warzone #1389"},
     {"alliance_id":"ICGO","faction":"Scarlet Legion","power":9862550440,"starting_spice":2481446,"daily_rate":133863,"name":"いちご","server":"Warzone #1390"},
+    {"alliance_id":"1CES","faction":"Scarlet Legion","power":12846831524,"starting_spice":2450636,"daily_rate":123814,"name":"ICEBERG ALLIANCE","server":"Warzone #1389"},
+    {"alliance_id":"STrH","faction":"Scarlet Legion","power":9645958335,"starting_spice":2378268,"daily_rate":111803,"name":"STAR HAVEN","server":"Warzone #1390"},
+    {"alliance_id":"LoFi","faction":"Scarlet Legion","power":9267253950,"starting_spice":2369431,"daily_rate":123974,"name":"LoFi Land","server":"Warzone #1389"},
+    {"alliance_id":"HOpE","faction":"Scarlet Legion","power":8661455980,"starting_spice":2352321,"daily_rate":115968,"name":"HeartOfPeaceEnergy","server":"Warzone #1389"},
 
     {"alliance_id":"VON","faction":"Golden Tribe","power":19075548647,"starting_spice":5422987,"daily_rate":148953,"name":"Chosen","server":"Warzone #1395"},
     {"alliance_id":"UTW","faction":"Golden Tribe","power":17711900592,"starting_spice":5240760,"daily_rate":149661,"name":"UTW","server":"Warzone #1395"},
