@@ -32,58 +32,58 @@ def _state(alliances, spice=None, event_number=1, day="wednesday"):
 
 class TestM3Heuristic:
     def test_wednesday_equal_power(self):
-        """Ratio 1.0 on Wednesday → full=0.50, partial=0.35 (cumulative=0.85)"""
+        """Ratio 1.0 on Wednesday → full=0.40, partial=0.15"""
         a = _alliance("a1", power=15e9)
         d = _alliance("d1", "blue", power=15e9)
         model = ConfigurableModel({"random_seed": 0}, [a, d])
         probs = model._heuristic_probabilities(a, d, "wednesday")
-        assert abs(probs["full_success"] - 0.50) < 0.01
-        assert abs(probs["partial_success"] - 0.35) < 0.01
+        assert abs(probs["full_success"] - 0.40) < 0.01
+        assert abs(probs["partial_success"] - 0.15) < 0.01
 
     def test_wednesday_strong_attacker(self):
-        """Ratio 1.20 on Wednesday → full≈1.0, partial≈0.0"""
+        """Ratio 1.20 on Wednesday → full≈0.67, partial≈0.26"""
         a = _alliance("a1", power=18e9)
         d = _alliance("d1", "blue", power=15e9)
         model = ConfigurableModel({"random_seed": 0}, [a, d])
         probs = model._heuristic_probabilities(a, d, "wednesday")
-        assert abs(probs["full_success"] - 1.0) < 0.01
-        assert abs(probs["partial_success"] - 0.0) < 0.01
+        assert abs(probs["full_success"] - 0.67) < 0.01
+        assert abs(probs["partial_success"] - 0.26) < 0.01
 
     def test_wednesday_weak_attacker(self):
-        """Ratio 0.67 on Wednesday → full≈0.0, partial≈0.27"""
+        """Ratio 0.67 on Wednesday → full≈0.0, partial≈0.0"""
         a = _alliance("a1", power=10e9)
         d = _alliance("d1", "blue", power=15e9)
         model = ConfigurableModel({"random_seed": 0}, [a, d])
         probs = model._heuristic_probabilities(a, d, "wednesday")
         assert abs(probs["full_success"] - 0.0) < 0.02
-        assert abs(probs["partial_success"] - 0.27) < 0.02
+        assert abs(probs["partial_success"] - 0.0) < 0.02
 
     def test_saturday_equal_power(self):
-        """Ratio 1.0 on Saturday → full≈0.25, partial≈0.40"""
+        """Ratio 1.0 on Saturday → full≈0.20, partial≈0.15"""
         a = _alliance("a1", power=15e9)
         d = _alliance("d1", "blue", power=15e9)
         model = ConfigurableModel({"random_seed": 0}, [a, d])
         probs = model._heuristic_probabilities(a, d, "saturday")
-        assert abs(probs["full_success"] - 0.25) < 0.01
-        assert abs(probs["partial_success"] - 0.40) < 0.01
+        assert abs(probs["full_success"] - 0.20) < 0.01
+        assert abs(probs["partial_success"] - 0.15) < 0.01
 
     def test_saturday_strong_attacker(self):
-        """Ratio 1.20 on Saturday → full≈0.90, partial≈0.10"""
+        """Ratio 1.20 on Saturday → full≈0.55, partial≈0.18"""
         a = _alliance("a1", power=18e9)
         d = _alliance("d1", "blue", power=15e9)
         model = ConfigurableModel({"random_seed": 0}, [a, d])
         probs = model._heuristic_probabilities(a, d, "saturday")
-        assert abs(probs["full_success"] - 0.90) < 0.01
-        assert abs(probs["partial_success"] - 0.10) < 0.01
+        assert abs(probs["full_success"] - 0.55) < 0.01
+        assert abs(probs["partial_success"] - 0.18) < 0.01
 
     def test_saturday_weak_attacker(self):
-        """Ratio 0.67 on Saturday → full≈0.0, partial≈0.07"""
+        """Ratio 0.67 on Saturday → full≈0.0, partial≈0.0"""
         a = _alliance("a1", power=10e9)
         d = _alliance("d1", "blue", power=15e9)
         model = ConfigurableModel({"random_seed": 0}, [a, d])
         probs = model._heuristic_probabilities(a, d, "saturday")
         assert abs(probs["full_success"] - 0.0) < 0.02
-        assert abs(probs["partial_success"] - 0.07) < 0.02
+        assert abs(probs["partial_success"] - 0.0) < 0.02
 
 
 class TestM3MatrixLookup:
@@ -130,12 +130,12 @@ class TestM3MultiAttacker:
         model = ConfigurableModel({"random_seed": 42}, [a1, a2, d1])
         state = _state([a1, a2, d1])
 
-        # a1 ratio=1.2: full=1.0, cumul=1.0, partial=0.0
-        # a2 ratio=0.8: full=0.0, cumul=0.5, partial=0.5
-        # average: full=0.5, partial=0.25
+        # a1 ratio=1.2: full=0.67, cumul=0.93, partial=0.26
+        # a2 ratio=0.8: full=0.13, cumul=0.17, partial=0.04
+        # average: full=0.40, partial=0.15
         _, probs = model.determine_battle_outcome(state, [a1, a2], [d1], "wednesday")
-        assert abs(probs["full_success"] - 0.5) < 0.01
-        assert abs(probs["partial_success"] - 0.25) < 0.01
+        assert abs(probs["full_success"] - 0.40) < 0.01
+        assert abs(probs["partial_success"] - 0.15) < 0.01
 
 
 # ── M4 Tests ─────────────────────────────────────────────────────

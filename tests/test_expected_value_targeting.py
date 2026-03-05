@@ -76,19 +76,19 @@ class TestESVAlgorithm:
         """Direct ESV calculation matches hand-computed values."""
         # Attacker 15B vs Defender 15B, 2M spice, Wednesday
         # ratio = 1.0
-        # full = max(0, min(1, 2.5*1.0 - 2.0)) = 0.5
-        # cumul_partial = max(0, min(1, 1.75*1.0 - 0.9)) = 0.85
-        # partial = 0.85 - 0.5 = 0.35
+        # full = max(0, min(1, 1.35*1.0 - 0.95)) = 0.40
+        # cumul_partial = max(0, min(1, 1.9*1.0 - 1.35)) = 0.55
+        # partial = 0.55 - 0.40 = 0.15
         # building_count(2M) = 3 (>= 1,805,000)
         # full theft = 3*5+10 = 25% → 2M * 0.25 = 500,000
         # partial theft = 3*5 = 15% → 2M * 0.15 = 300,000
-        # ESV = 0.5*500,000 + 0.35*300,000 = 250,000 + 105,000 = 355,000
+        # ESV = 0.40*500,000 + 0.15*300,000 = 200,000 + 45,000 = 245,000
         a = _alliance("A", power=15e9)
         d = _alliance("D", "blue", power=15e9, spice=2_000_000)
         model = ConfigurableModel({}, [a, d])
         state = _state([a, d])
         esv = model._calculate_esv(a, d, state)
-        assert esv == pytest.approx(355_000.0)
+        assert esv == pytest.approx(245_000.0)
 
     def test_05_building_count_affects_esv(self):
         """Higher building count (more spice) → higher theft % → higher ESV."""

@@ -243,11 +243,11 @@ def _heuristic_probabilities(self, attacker, defender, day):
     ratio = attacker.power / defender.power
 
     if day == "wednesday":
-        full = max(0.0, min(1.0, 2.5 * ratio - 2.0))
-        cumulative_partial = max(0.0, min(1.0, 1.75 * ratio - 0.9))
+        full = max(0.0, min(1.0, 1.35 * ratio - 0.95))
+        cumulative_partial = max(0.0, min(1.0, 1.9 * ratio - 1.35))
     else:  # saturday
-        full = max(0.0, min(1.0, 3.25 * ratio - 3.0))
-        cumulative_partial = max(0.0, min(1.0, 1.75 * ratio - 1.1))
+        full = max(0.0, min(1.0, 1.75 * ratio - 1.55))
+        cumulative_partial = max(0.0, min(1.0, 1.9 * ratio - 1.55))
 
     partial = max(0.0, cumulative_partial - full)
     return {"full_success": full, "partial_success": partial}
@@ -256,23 +256,24 @@ def _heuristic_probabilities(self, attacker, defender, day):
 **Approximate behavior (Wednesday — easier for attackers):**
 | Ratio | Example       | full_success | partial_only | fail |
 |-------|---------------|-------------|-------------|------|
-| 1.20  | 18B vs 15B    | 1.00        | 0.00        | 0.00 |
-| 1.07  | 16B vs 15B    | 0.67        | 0.30        | 0.03 |
-| 1.00  | 15B vs 15B    | 0.50        | 0.25        | 0.25 |
-| 0.67  | 10B vs 15B    | 0.00        | 0.27        | 0.73 |
+| 1.20  | 18B vs 15B    | 0.67        | 0.26        | 0.07 |
+| 1.07  | 16B vs 15B    | 0.49        | 0.19        | 0.32 |
+| 1.00  | 15B vs 15B    | 0.40        | 0.15        | 0.45 |
+| 0.67  | 10B vs 15B    | 0.00        | 0.00        | 1.00 |
 
 **Approximate behavior (Saturday — harder for attackers):**
 | Ratio | Example       | full_success | partial_only | fail |
 |-------|---------------|-------------|-------------|------|
-| 1.20  | 18B vs 15B    | 0.90        | 0.10        | 0.00 |
-| 1.07  | 16B vs 15B    | 0.47        | 0.30        | 0.23 |
-| 1.00  | 15B vs 15B    | 0.25        | 0.40        | 0.35 |
-| 0.67  | 10B vs 15B    | 0.00        | 0.07        | 0.93 |
+| 1.20  | 18B vs 15B    | 0.55        | 0.18        | 0.27 |
+| 1.07  | 16B vs 15B    | 0.32        | 0.16        | 0.52 |
+| 1.00  | 15B vs 15B    | 0.20        | 0.15        | 0.65 |
+| 0.67  | 10B vs 15B    | 0.00        | 0.00        | 1.00 |
 
 **Notes:**
-- Wednesday uses shallower slopes, reflecting easier attacking conditions
-- Saturday uses a steeper full_success slope, making full victories harder to achieve
-- Heuristic parameters can be tuned if needed
+- Slopes calibrated against S3 event 5 real-world outcomes (20 battles, Wednesday)
+- Saturday slopes derived proportionally (no real data yet)
+- Even matchups (ratio 1.0) fail ~45% on Wednesday, ~65% on Saturday
+- Heuristic parameters can be tuned as more event data becomes available
 
 ### Handling Multiple Attackers
 
@@ -344,7 +345,7 @@ def determine_damage_splits(self, state, attackers, primary_defender):
 | 18B + 16B + 12B | 1.20, 1.07, 0.80 | 0.80, 0.60, 0.20 | 50/37/13 | 39/35/26 |
 
 **Notes:**
-- The heuristic uses slope 1.5 (average of M3 outcome slopes) to scale power ratios
+- The heuristic uses slope 1.5 to scale power ratios
 - Attackers below ratio ~0.67 contribute zero effective weight
 - Weights and power are never mixed — it's all-or-nothing on user-supplied weights
 

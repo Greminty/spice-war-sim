@@ -480,11 +480,11 @@ class ConfigurableModel(BattleModel):
         ratio = self._get_power(attacker.alliance_id) / self._get_power(defender.alliance_id)
 
         if day == "wednesday":
-            full = max(0.0, min(1.0, 2.5 * ratio - 2.0))
-            cumulative_partial = max(0.0, min(1.0, 1.75 * ratio - 0.9))
+            full = max(0.0, min(1.0, 1.35 * ratio - 0.95))
+            cumulative_partial = max(0.0, min(1.0, 1.9 * ratio - 1.35))
         else:  # saturday
-            full = max(0.0, min(1.0, 3.25 * ratio - 3.0))
-            cumulative_partial = max(0.0, min(1.0, 1.75 * ratio - 1.1))
+            full = max(0.0, min(1.0, 1.75 * ratio - 1.55))
+            cumulative_partial = max(0.0, min(1.0, 1.9 * ratio - 1.55))
 
         partial = max(0.0, cumulative_partial - full)
         return {"full_success": full, "partial_success": partial}
