@@ -733,22 +733,7 @@ function computeHeuristicHints(attackerId, defenderId, day) {
     const dPower = power[defenderId];
     if (!aPower || !dPower) return null;
 
-    const ratio = aPower / dPower;
-    let full, cumulativePartial;
-
-    if (day === "wednesday") {
-        full = Math.max(0, Math.min(1, 2.5 * ratio - 2.0));
-        cumulativePartial = Math.max(0, Math.min(1, 1.75 * ratio - 0.9));
-    } else {
-        full = Math.max(0, Math.min(1, 3.25 * ratio - 3.0));
-        cumulativePartial = Math.max(0, Math.min(1, 1.75 * ratio - 1.1));
-    }
-
-    const partial = Math.max(0, cumulativePartial - full);
-    return {
-        full: Math.round(full * 100),
-        partial: Math.round(partial * 100),
-    };
+    return PyBridge.computeHeuristic(aPower, dPower, day);
 }
 
 function updateHeuristicPlaceholders(row, day) {

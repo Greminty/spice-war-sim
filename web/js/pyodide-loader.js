@@ -57,4 +57,5 @@ const PyBridge = {
     runMonteCarlo: (state, model, n, seed) => callBridgeAsync("run_monte_carlo", state, model, n, seed),
     importCsv: (csvText) => callBridge("import_csv", csvText),
     generateTemplateCsv: (state, topN) => callBridge("generate_template_csv", state, topN),
+    computeHeuristic: (aPower, dPower, day) => callBridge("compute_heuristic", aPower, dPower, day),
 };

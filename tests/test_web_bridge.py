@@ -1,6 +1,9 @@
 import pytest
 
+from spice_war.models.configurable import ConfigurableModel, heuristic_from_ratio
+from spice_war.utils.data_structures import Alliance
 from spice_war.web.bridge import (
+    compute_heuristic,
     generate_template_csv,
     get_default_model_config,
     get_default_state,
@@ -230,3 +233,37 @@ def test_import_csv_unrecognized_rows():
     result = import_csv("not,valid,csv,data\nwith,random,stuff,here")
     assert result["ok"] is True
     assert result["config"] == {}
+
+
+# --- Heuristic consistency ---
+
+@pytest.mark.parametrize("day", ["wednesday", "saturday"])
+@pytest.mark.parametrize("ratio", [0.3, 0.5, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0])
+def test_compute_heuristic_matches_model(day, ratio):
+    """Bridge heuristic must match the model's internal heuristic."""
+    att_power = 1_000_000 * ratio
+    def_power = 1_000_000
+
+    # Bridge function (what the web UI calls)
+    bridge_result = compute_heuristic(att_power, def_power, day)
+
+    # Model's internal heuristic (what the engine uses)
+    model_result = heuristic_from_ratio(ratio, day)
+
+    assert bridge_result["full"] == round(model_result["full_success"] * 100)
+    assert bridge_result["partial"] == round(model_result["partial_success"] * 100)
+
+
+@pytest.mark.parametrize("day", ["wednesday", "saturday"])
+def test_model_heuristic_uses_shared_function(day):
+    """ConfigurableModel._heuristic_probabilities must delegate to heuristic_from_ratio."""
+    att = Alliance("A", "red", 1_500_000, 0, 0)
+    defn = Alliance("B", "blue", 1_000_000, 0, 0)
+
+    model = ConfigurableModel({"random_seed": 0}, [att, defn])
+    model.set_effective_powers()
+
+    model_probs = model._heuristic_probabilities(att, defn, day)
+    direct_probs = heuristic_from_ratio(1.5, day)
+
+    assert model_probs == direct_probs

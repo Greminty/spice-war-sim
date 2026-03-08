@@ -9,6 +9,19 @@ from spice_war.models.base import BattleModel
 from spice_war.utils.data_structures import Alliance, GameState
 
 
+def heuristic_from_ratio(ratio: float, day: str) -> dict[str, float]:
+    """Compute heuristic battle probabilities from a power ratio and day."""
+    if day == "wednesday":
+        full = max(0.0, min(1.0, 1.35 * ratio - 0.95))
+        cumulative_partial = max(0.0, min(1.0, 1.9 * ratio - 1.35))
+    else:  # saturday
+        full = max(0.0, min(1.0, 1.65 * ratio - 1.10))
+        cumulative_partial = max(0.0, min(1.0, 1.65 * ratio - 0.85))
+
+    partial = max(0.0, cumulative_partial - full)
+    return {"full_success": full, "partial_success": partial}
+
+
 class ConfigurableModel(BattleModel):
     def __init__(self, config: dict, alliances: list[Alliance]):
         self.config = config
@@ -478,16 +491,7 @@ class ConfigurableModel(BattleModel):
         self, attacker: Alliance, defender: Alliance, day: str
     ) -> dict[str, float]:
         ratio = self._get_power(attacker.alliance_id) / self._get_power(defender.alliance_id)
-
-        if day == "wednesday":
-            full = max(0.0, min(1.0, 1.35 * ratio - 0.95))
-            cumulative_partial = max(0.0, min(1.0, 1.9 * ratio - 1.35))
-        else:  # saturday
-            full = max(0.0, min(1.0, 1.65 * ratio - 1.10))
-            cumulative_partial = max(0.0, min(1.0, 1.65 * ratio - 0.85))
-
-        partial = max(0.0, cumulative_partial - full)
-        return {"full_success": full, "partial_success": partial}
+        return heuristic_from_ratio(ratio, day)
 
     def _apply_outcome_noise(
         self,

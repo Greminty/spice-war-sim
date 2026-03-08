@@ -5,7 +5,7 @@ import io
 
 from spice_war.game.monte_carlo import run_monte_carlo as run_monte_carlo_impl
 from spice_war.game.simulator import simulate_war
-from spice_war.models.configurable import ConfigurableModel
+from spice_war.models.configurable import ConfigurableModel, heuristic_from_ratio
 from spice_war.utils.data_structures import Alliance, EventConfig
 from spice_war.utils.validation import ValidationError, _check_model_references
 
@@ -329,6 +329,16 @@ def run_monte_carlo(
         }
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
+
+def compute_heuristic(attacker_power: float, defender_power: float, day: str) -> dict:
+    """Compute heuristic battle probabilities for a power ratio and day."""
+    ratio = attacker_power / defender_power if defender_power > 0 else 0.0
+    probs = heuristic_from_ratio(ratio, day)
+    return {
+        "full": round(probs["full_success"] * 100),
+        "partial": round(probs["partial_success"] * 100),
+    }
 
 
 def import_csv(csv_text: str) -> dict:
