@@ -63,22 +63,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (hash) {
         try {
             const config = await decodeHashToConfig(hash);
-            if (config && config.v === 1) {
-                document.getElementById("state-textarea").value = JSON.stringify(config.state, null, 2);
-                validateState();
-
-                modelFormData = config.model;
-                document.getElementById("model-textarea").value = JSON.stringify(config.model, null, 2);
-                buildModelForm();
-                validateModel();
-
+            if (config) {
+                if (config.v === 1 && config.state) {
+                    document.getElementById("state-textarea").value = JSON.stringify(config.state, null, 2);
+                    validateState();
+                }
+                if (config.model) {
+                    modelFormData = config.model;
+                    document.getElementById("model-textarea").value = JSON.stringify(config.model, null, 2);
+                    buildModelForm();
+                    validateModel();
+                }
                 if (config.seed != null) {
                     document.getElementById("single-seed").value = config.seed;
                 }
                 document.getElementById("mc-iterations").value = config.mcIterations || 1000;
                 document.getElementById("mc-base-seed").value = config.mcBaseSeed || 0;
 
-                showNotification("Configuration loaded from shared URL");
+                const msg = config.v === 1
+                    ? "Configuration loaded from shared URL"
+                    : "Model config loaded from shared link";
+                showNotification(msg);
             }
         } catch {
             // Invalid hash — silently ignore
@@ -1478,8 +1483,13 @@ function renderMonteCarloResults(result) {
         html += `<tr><td>${esc(factions[aid] || "")}</td><td>${esc(aid)}</td>`;
         const dist = result.tier_distribution[aid];
         for (let t = 1; t <= 5; t++) {
-            const pct = (parseFloat(dist[String(t)] || 0) * 100).toFixed(1);
-            html += `<td>${pct}%</td>`;
+            const frac = parseFloat(dist[String(t)] || 0);
+            const pct = (frac * 100).toFixed(1);
+            if (frac > 0) {
+                html += `<td class="tier-cell-clickable" data-aid="${esc(aid)}" data-tier="${t}" title="Click to see an example run">${pct}%</td>`;
+            } else {
+                html += `<td>${pct}%</td>`;
+            }
         }
         html += "</tr>";
     }
@@ -1555,8 +1565,91 @@ function renderMonteCarloResults(result) {
 
     container.innerHTML = html;
 
+    // Delegated click handler for tier distribution cells
+    container.addEventListener("click", async (e) => {
+        const cell = e.target.closest(".tier-cell-clickable");
+        if (!cell || !lastResult || !lastResult.raw_results) return;
+
+        const aid = cell.dataset.aid;
+        const tier = parseInt(cell.dataset.tier, 10);
+
+        const matching = lastResult.raw_results.filter(r => r.rankings[aid] === tier);
+        if (!matching.length) return;
+
+        const pick = matching[Math.floor(Math.random() * matching.length)];
+
+        const stateDict = JSON.parse(document.getElementById("state-textarea").value);
+        const modelDict = JSON.parse(document.getElementById("model-textarea").value);
+        const singleResult = await PyBridge.runSingle(stateDict, modelDict, pick.seed);
+        if (!singleResult.ok) return;
+
+        showExampleRunModal(aid, tier, singleResult);
+    });
+
     renderTierChart(aids, result.tier_distribution);
     renderSpiceChart(aids, result.spice_stats);
+}
+
+// --- Example Run Modal ---
+
+function showExampleRunModal(aid, tier, result) {
+    const existing = document.getElementById("example-run-modal");
+    if (existing) existing.remove();
+
+    const factions = getAllianceFaction();
+    const allowed = getFilteredAlliances(resultFilter);
+    const ranks = computeRanks(result.final_spice);
+
+    const overlay = document.createElement("div");
+    overlay.id = "example-run-modal";
+    overlay.className = "modal-overlay";
+
+    let html = '<div class="modal-content">';
+    html += '<button class="modal-close">&times;</button>';
+    html += `<h2>Example: ${esc(aid)} finishing T${tier} — seed ${result.seed}</h2>`;
+    const factionName = factions[aid] || "";
+    if (factionName) {
+        html += `<p class="help-text">Faction: ${esc(factionName)}</p>`;
+    }
+
+    // Final rankings table
+    const entries = Object.entries(result.final_spice)
+        .map(([id, spice]) => ({ id, spice, tier: result.rankings[id], rank: ranks[id] }));
+    entries.sort((a, b) => a.rank - b.rank);
+
+    html += "<h3>Final Rankings</h3>";
+    html += "<table><tr><th>Faction</th><th>Alliance</th><th>Rank</th><th>Tier</th><th>Final Spice</th></tr>";
+    for (const e of entries) {
+        if (allowed && !allowed.has(e.id)) continue;
+        const highlight = e.id === aid ? ' style="background:#fffde7"' : "";
+        html += `<tr${highlight}>
+            <td>${esc(factions[e.id] || "")}</td>
+            <td>${esc(e.id)}</td>
+            <td>${e.rank}</td>
+            <td>T${e.tier}</td>
+            <td>${e.spice.toLocaleString()}</td>
+        </tr>`;
+    }
+    html += "</table>";
+
+    // Event-by-event breakdown
+    html += "<h3>Event History</h3>";
+    for (let i = 0; i < result.event_history.length; i++) {
+        const event = result.event_history[i];
+        html += `<details><summary>Event ${event.event_number}: ${esc(event.attacker_faction)} (${esc(event.day)})</summary>`;
+        html += renderEventDetail(event, allowed);
+        html += "</details>";
+    }
+
+    html += "</div>";
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+
+    // Close handlers
+    overlay.querySelector(".modal-close").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
 }
 
 // --- Charts ---
@@ -1649,10 +1742,9 @@ function showNotification(message, type = "info") {
 
 // --- Shareable URL ---
 
-async function encodeConfigToHash() {
+async function encodeModelToHash() {
     const payload = {
-        v: 1,
-        state: JSON.parse(document.getElementById("state-textarea").value),
+        v: 2,
         model: JSON.parse(document.getElementById("model-textarea").value),
         seed: document.getElementById("single-seed").value || null,
         mcIterations: parseInt(document.getElementById("mc-iterations").value, 10) || 1000,
@@ -1673,13 +1765,21 @@ async function encodeConfigToHash() {
     let base64 = btoa(String.fromCharCode(...compressedBytes));
     base64 = base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-    return `v1:${base64}`;
+    return `v2:${base64}`;
 }
 
 async function decodeHashToConfig(hash) {
-    if (!hash || !hash.startsWith("v1:")) return null;
+    let version, base64url;
+    if (hash.startsWith("v2:")) {
+        version = 2;
+        base64url = hash.slice(3);
+    } else if (hash.startsWith("v1:")) {
+        version = 1;
+        base64url = hash.slice(3);
+    } else {
+        return null;
+    }
 
-    const base64url = hash.slice(3);
     let base64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
     while (base64.length % 4) base64 += "=";
 
@@ -1693,12 +1793,14 @@ async function decodeHashToConfig(hash) {
     const decompressed = await new Response(ds.readable).arrayBuffer();
     const json = new TextDecoder().decode(decompressed);
 
-    return JSON.parse(json);
+    const config = JSON.parse(json);
+    config.v = version;
+    return config;
 }
 
 async function shareConfig() {
     try {
-        const hash = await encodeConfigToHash();
+        const hash = await encodeModelToHash();
         const url = `${window.location.origin}${window.location.pathname}#${hash}`;
 
         if (url.length > 8000) {
@@ -1708,7 +1810,7 @@ async function shareConfig() {
 
         window.location.hash = hash;
         await navigator.clipboard.writeText(url);
-        showNotification("Link copied to clipboard");
+        showNotification("Model link copied \u2014 recipient needs the same game state loaded");
     } catch (e) {
         showNotification("Failed to generate share link: " + e.message, "error");
     }
