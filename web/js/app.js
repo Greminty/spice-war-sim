@@ -1558,17 +1558,12 @@ function renderMonteCarloResults(result) {
         const aid = cell.dataset.aid;
         const tier = parseInt(cell.dataset.tier, 10);
 
-        const matching = lastResult.raw_results.filter(r => r.rankings[aid] === tier);
+        const matching = lastResult.raw_results
+            .filter(r => r.rankings[aid] === tier)
+            .sort((a, b) => a.seed - b.seed);
         if (!matching.length) return;
 
-        const pick = matching[Math.floor(Math.random() * matching.length)];
-
-        const stateDict = JSON.parse(document.getElementById("state-textarea").value);
-        const modelDict = JSON.parse(document.getElementById("model-textarea").value);
-        const singleResult = await PyBridge.runSingle(stateDict, modelDict, pick.seed);
-        if (!singleResult.ok) return;
-
-        showExampleRunModal(aid, tier, singleResult);
+        await showExampleRunModal(aid, tier, matching, 0);
     });
 
     renderTierChart(aids, result.tier_distribution);
@@ -1577,7 +1572,12 @@ function renderMonteCarloResults(result) {
 
 // --- Example Run Modal ---
 
-function showExampleRunModal(aid, tier, result) {
+async function showExampleRunModal(aid, tier, matching, index) {
+    const stateDict = JSON.parse(document.getElementById("state-textarea").value);
+    const modelDict = JSON.parse(document.getElementById("model-textarea").value);
+    const result = await PyBridge.runSingle(stateDict, modelDict, matching[index].seed);
+    if (!result.ok) return;
+
     const existing = document.getElementById("example-run-modal");
     if (existing) existing.remove();
 
@@ -1596,6 +1596,13 @@ function showExampleRunModal(aid, tier, result) {
     if (factionName) {
         html += `<p class="help-text">Faction: ${esc(factionName)}</p>`;
     }
+
+    // Navigation controls
+    html += '<div class="modal-nav">';
+    html += `<button class="modal-prev"${index === 0 ? " disabled" : ""}>&larr; Prev</button>`;
+    html += `<span>${index + 1} of ${matching.length}</span>`;
+    html += `<button class="modal-next"${index === matching.length - 1 ? " disabled" : ""}>Next &rarr;</button>`;
+    html += '</div>';
 
     // Final rankings table
     const entries = Object.entries(result.final_spice)
@@ -1629,6 +1636,14 @@ function showExampleRunModal(aid, tier, result) {
     html += "</div>";
     overlay.innerHTML = html;
     document.body.appendChild(overlay);
+
+    // Navigation handlers
+    overlay.querySelector(".modal-prev").addEventListener("click", () => {
+        if (index > 0) showExampleRunModal(aid, tier, matching, index - 1);
+    });
+    overlay.querySelector(".modal-next").addEventListener("click", () => {
+        if (index < matching.length - 1) showExampleRunModal(aid, tier, matching, index + 1);
+    });
 
     // Close handlers
     overlay.querySelector(".modal-close").addEventListener("click", () => overlay.remove());

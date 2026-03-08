@@ -572,6 +572,31 @@ summary h3 {
     color: #333;
 }
 
+.modal-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 0.9em;
+}
+
+.modal-nav button {
+    padding: 4px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.modal-nav button:hover:not(:disabled) {
+    background: #f0f0f0;
+}
+
+.modal-nav button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 /* Clickable tier distribution cells */
 .tier-cell-clickable {
     cursor: pointer;
