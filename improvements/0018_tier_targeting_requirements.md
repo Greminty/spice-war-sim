@@ -326,7 +326,7 @@ All four are valid values at every level of the targeting resolution hierarchy:
 | 24 | **maximize_tier accepted everywhere** | Same as above |
 | 25 | **Invalid tier_optimization_top_n** | Non-positive integer raises validation error |
 | 26 | **Invalid tier_optimization_fallback** | Unrecognized strategy name raises validation error |
-| 27 | **maximize_tier fields ignored for other strategies** | `tier_optimization_top_n` present but `targeting_strategy` is `"expected_value"` — no error, field ignored |
+| 27 | **maximize_tier fields rejected for other strategies** | `tier_optimization_top_n` present but `targeting_strategy` is `"expected_value"` — raises validation error |
 
 ### Backward Compatibility
 
